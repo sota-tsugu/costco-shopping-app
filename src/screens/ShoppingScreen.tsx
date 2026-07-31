@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Plus, Minus, PlusCircle, CheckCircle2 } from 'lucide-react'
-import { useCartStore, calcTotal } from '../store/cartStore'
+import { useCartStore, calcTotal, calcUnitPriceLabel } from '../store/cartStore'
 import { AddProductForm } from './AddProductForm'
 
 // 買い物中のメイン画面。
@@ -90,8 +90,11 @@ export function ShoppingScreen() {
                 <span className="mb-1 line-clamp-2 text-sm font-medium text-slate-800">
                   {product.name}
                 </span>
-                <span className="mb-3 text-xs text-slate-400">
+                <span className="text-xs text-slate-400">
                   ¥{(product.default_price ?? 0).toLocaleString()}
+                </span>
+                <span className="mb-3 text-xs text-blue-700">
+                  {calcUnitPriceLabel(product) ?? ' '}
                 </span>
 
                 {quantity === 0 ? (

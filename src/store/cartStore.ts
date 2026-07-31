@@ -68,13 +68,30 @@ type CartState = {
   startTrip: (budget: number) => Promise<void>
   addToCart: (product: Product) => void
   decrementFromCart: (productId: number) => void
-  addFavoriteProduct: (name: string, price: number) => Promise<void>
+  addFavoriteProduct: (
+    name: string,
+    price: number,
+    amount: number | null,
+    unit: string | null,
+  ) => Promise<void>
   completeCheckout: () => Promise<void>
 }
 
 /** 現在のカート内合計金額を計算する(メモリ上の状態だけで完結、高速) */
 export function calcTotal(cartItems: Record<number, CartItem>): number {
   return Object.values(cartItems).reduce((sum, item) => sum + item.price * item.quantity, 0)
+}
+
+/**
+ * 内容量(g/mlなど)が登録されている商品の単価を計算して表示用の文字列にする。
+ * 内容量・単位が未入力の商品ではnullを返す(単価表示自体を省略する)。
+ */
+export function calcUnitPriceLabel(product: Product): string | null {
+  if (!product.unit || !product.amount || product.amount <= 0 || !product.default_price) {
+    return null
+  }
+  const unitPrice = product.default_price / product.amount
+  return `¥${unitPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })} / ${product.unit}`
 }
 
 export const useCartStore = create<CartState>((set, get) => ({
@@ -249,11 +266,11 @@ export const useCartStore = create<CartState>((set, get) => ({
     })
   },
 
-  async addFavoriteProduct(name: string, price: number) {
+  async addFavoriteProduct(name: string, price: number, amount: number | null, unit: string | null) {
     const now = new Date().toISOString()
     await dbClient.run(
-      'INSERT INTO product (name, default_price, is_favorite, created_at) VALUES (?, ?, 1, ?)',
-      [name, price, now],
+      'INSERT INTO product (name, default_price, amount, unit, is_favorite, created_at) VALUES (?, ?, ?, ?, 1, ?)',
+      [name, price, amount, unit, now],
     )
     const idResult = await dbClient.exec('SELECT last_insert_rowid() AS id')
     const [{ id }] = rowsToObjects<{ id: number }>(idResult)
@@ -262,8 +279,8 @@ export const useCartStore = create<CartState>((set, get) => ({
       id,
       name,
       category: null,
-      amount: null,
-      unit: null,
+      amount,
+      unit,
       default_price: price,
       is_favorite: 1,
       created_at: now,
