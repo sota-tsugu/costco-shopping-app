@@ -33,19 +33,97 @@ async function ensureSqlJsLoaded(): Promise<SqlJsStatic> {
   return SQL
 }
 
+// スキーマのバージョン管理(マイグレーション)。
+// テーブル構造を変える必要が出てきたら、ここに新しいバージョンの
+// ブロックを追加していく。既存ユーザーのデータを壊さずに構造を
+// 変更するための仕組み。schema_versionテーブルに適用済みのバージョン
+// を記録しておき、まだ適用されていないバージョンだけを順番に実行する。
+type Migration = {
+  version: number
+  description: string
+  statements: string[]
+}
+
+const MIGRATIONS: Migration[] = [
+  {
+    version: 1,
+    description: 'STEP0動作確認用のダミーテーブル',
+    statements: [
+      `CREATE TABLE IF NOT EXISTS smoke_test (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        message TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );`,
+    ],
+  },
+  {
+    version: 2,
+    description: 'フェーズ1-a: Product/ShoppingTrip/Purchaseの最小テーブル構成。smoke_testは撤去',
+    statements: [
+      `DROP TABLE IF EXISTS smoke_test;`,
+      `CREATE TABLE IF NOT EXISTS product (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        category TEXT,
+        amount REAL,
+        unit TEXT,
+        default_price REAL,
+        is_favorite INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL
+      );`,
+      `CREATE TABLE IF NOT EXISTS shopping_trip (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        budget REAL NOT NULL,
+        status TEXT NOT NULL DEFAULT 'active',
+        started_at TEXT NOT NULL,
+        completed_at TEXT,
+        actual_total REAL
+      );`,
+      `CREATE TABLE IF NOT EXISTS purchase (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        product_id INTEGER NOT NULL REFERENCES product(id),
+        trip_id INTEGER NOT NULL REFERENCES shopping_trip(id),
+        price REAL NOT NULL,
+        quantity INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL
+      );`,
+      `CREATE INDEX IF NOT EXISTS idx_purchase_product_date ON purchase(product_id, created_at);`,
+      `CREATE INDEX IF NOT EXISTS idx_purchase_trip ON purchase(trip_id);`,
+    ],
+  },
+]
+
+function runMigrations(database: Database) {
+  database.run(
+    `CREATE TABLE IF NOT EXISTS schema_version (
+      version INTEGER NOT NULL,
+      applied_at TEXT NOT NULL
+    );`,
+  )
+
+  const result = database.exec('SELECT MAX(version) AS current_version FROM schema_version')
+  const currentVersion = (result[0]?.values[0]?.[0] as number | null) ?? 0
+
+  const pending = MIGRATIONS.filter((m) => m.version > currentVersion).sort(
+    (a, b) => a.version - b.version,
+  )
+
+  for (const migration of pending) {
+    for (const statement of migration.statements) {
+      database.run(statement)
+    }
+    database.run('INSERT INTO schema_version (version, applied_at) VALUES (?, ?)', [
+      migration.version,
+      new Date().toISOString(),
+    ])
+  }
+}
+
 async function handleInit(bytes: ArrayBuffer | null) {
   const sqlJs = await ensureSqlJsLoaded()
   db = bytes ? new sqlJs.Database(new Uint8Array(bytes)) : new sqlJs.Database()
 
-  // STEP0時点の動作確認用ダミーテーブル。
-  // 本番用のProduct/Purchase等のテーブル設計はSTEP1以降で行う。
-  db.run(`
-    CREATE TABLE IF NOT EXISTS smoke_test (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      message TEXT NOT NULL,
-      created_at TEXT NOT NULL
-    );
-  `)
+  runMigrations(db)
 
   return { initialized: true }
 }

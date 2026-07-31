@@ -18,7 +18,7 @@
 
 ## 現在のフェーズ
 
-**STEP0(環境構築)完了。次はSTEP1(フェーズ1-a実装)。**
+**STEP0(環境構築)・STEP1(フェーズ1-a)完了。次はフェーズ1-b。**
 
 STEP0で行ったこと:
 - Vite + React + TypeScriptのプロジェクト雛形作成
@@ -27,11 +27,20 @@ STEP0で行ったこと:
 - IndexedDBへのDB永続化の土台構築(`src/db/persistence.ts`)
 - PWA設定(`vite-plugin-pwa`によるmanifestとService Worker自動生成)
 - GitHub Actionsによる、mainブランチへのpushをトリガーとした自動デプロイ(`.github/workflows/deploy.yml`)
-- 動作確認用のダミー画面(`src/App.tsx`。SELECT 1の実行確認、ダミーテーブルへの追加・永続化確認)
 
-まだ実装していないもの(STEP1以降):
-- Product / Purchase / ShoppingTripなど本番用テーブル設計
-- カート・予算・マイ定番棚などの実際のアプリ機能
+STEP1(フェーズ1-a)で行ったこと:
+- schema_versionによるマイグレーション機構(`src/db/worker.ts`の`MIGRATIONS`)。STEP0のダミーテーブル(smoke_test)は撤去し、Product/ShoppingTrip/Purchaseの最小構成に置き換えた
+- Zustandによるカート状態管理(`src/store/cartStore.ts`)。合計金額はメモリ上で即時計算し、SQLiteへの書き込みは商品ごとに順序を保証したキュー経由で非同期実行(企画書の方針通り)
+- 予算設定画面(`src/screens/BudgetSetupScreen.tsx`)。**予算は「買い物1回ごと」に設定する方式**を採用(月間予算などの期間管理はまだ実装していない)
+- 買い物画面(`src/screens/ShoppingScreen.tsx`)。合計金額・予算プログレスバーを上部固定表示、マイ定番棚をタップしてカートに追加、下部固定の会計完了ボタン
+- 商品追加フォーム(`src/screens/AddProductForm.tsx`)。商品名と価格のみの最小入力(内容量・JANコード等はフェーズ1-bで扱う)
+- STEP0の動作確認用ダミー画面は削除し、`src/App.tsx`は本番画面の切り替え(budget-setup / shopping)のみを担う構成に変更
+
+まだ実装していないもの(フェーズ1-b以降):
+- 内容量(g/ml)ベースの単価自動計算
+- 過去購入履歴・購入頻度の確認、過去価格との比較
+- 事前買い物予定リスト(Wishlist)、ProductAlias(表記ゆれ吸収)
+- 複数店舗対応(Store)、家族メンバー対応(FamilyMember)、シンプル/パワーユーザーモード切り替え
 
 ## 技術構成(決定済み・変更しない)
 
@@ -51,6 +60,12 @@ STEP0で行ったこと:
 
 - **Worker⇔メイン画面の通信はComlinkを使わず自前の軽量RPC(`dbClient.ts`)で実装**:依存ライブラリを最小限にし、後から読む人が仕組みを追いやすくするため。将来複雑になったらComlink導入を再検討してよい
 - **sql.jsのWASMファイルはViteの`?url`インポートでバンドル**:postinstallスクリプトでのファイルコピーより構成がシンプルで、PWAのキャッシュ対象にも自動的に含まれるため
+
+## STEP1で行った技術的な判断(理由付き)
+
+- **予算は「買い物1回ごと」に設定する方式を採用**:月間予算などの期間管理も検討したが、シンプルさを優先し、企画書のShoppingTrip(買い物単位)の設計にそのまま沿う形にした。SOTAさんとの確認の上での決定
+- **カートの実体はPurchaseテーブルの行そのもの**:「カート」と「購入履歴」を別概念として持たず、進行中のShoppingTrip(status='active')に紐づくPurchase行=そのままカートの中身、として扱う設計にした。会計完了時にShoppingTripのstatusを'completed'に変えるだけで、購入履歴側の記録が自動的に確定する
+- **商品ごとの保存処理を順序保証キューで実行**(`cartStore.ts`の`enqueueSync`):合計金額はメモリ上で即時計算する方針(企画書4章)のため、SQLiteへの書き込みは画面表示を待たせずに裏側で行う。ただし同じ商品を連続タップした際に保存処理の順番が入れ替わるとデータがずれるため、商品IDごとに「必ず前の保存処理が終わってから次を実行する」キューを設けている
 
 ## 【重要】Claude Coworkの作業環境に関する制約
 

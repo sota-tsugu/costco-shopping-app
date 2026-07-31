@@ -80,3 +80,22 @@ class DbClient {
 
 // アプリ全体で1つのWorker・1つのDB接続を使い回す
 export const dbClient = new DbClient()
+
+/**
+ * dbClient.exec() の戻り値([{columns, values}]形式)を、
+ * 扱いやすいオブジェクトの配列(1行=1オブジェクト)に変換する。
+ * 例: [{id:1, name:"トイレットペーパー"}, ...]
+ */
+export function rowsToObjects<T = Record<string, unknown>>(
+  result: { columns: string[]; values: unknown[][] }[],
+): T[] {
+  const table = result[0]
+  if (!table) return []
+  return table.values.map((row) => {
+    const obj: Record<string, unknown> = {}
+    table.columns.forEach((col, i) => {
+      obj[col] = row[i]
+    })
+    return obj as T
+  })
+}
