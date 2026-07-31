@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Plus, Minus, PlusCircle, CheckCircle2 } from 'lucide-react'
-import { useCartStore, calcTotal, calcUnitPriceLabel } from '../store/cartStore'
+import { useCartStore, calcTotal, calcUnitPriceLabel, type Product } from '../store/cartStore'
 import { AddProductForm } from './AddProductForm'
+import { ProductHistoryModal } from './ProductHistoryModal'
 
 // 買い物中のメイン画面。
 // UI/UXの4原則(企画書 6章)を意識したレイアウト:
@@ -22,6 +23,7 @@ export function ShoppingScreen() {
 
   const [isAddFormOpen, setIsAddFormOpen] = useState(false)
   const [isCheckingOut, setIsCheckingOut] = useState(false)
+  const [historyProduct, setHistoryProduct] = useState<Product | null>(null)
 
   const total = calcTotal(cartItems)
   const progressRatio = budget > 0 ? Math.min(total / budget, 1) : 0
@@ -87,9 +89,12 @@ export function ShoppingScreen() {
                 key={product.id}
                 className="flex flex-col rounded-xl bg-white p-3 shadow-sm"
               >
-                <span className="mb-1 line-clamp-2 text-sm font-medium text-slate-800">
+                <button
+                  onClick={() => setHistoryProduct(product)}
+                  className="mb-1 line-clamp-2 text-left text-sm font-medium text-slate-800 underline decoration-slate-300 underline-offset-2"
+                >
                   {product.name}
-                </span>
+                </button>
                 <span className="text-xs text-slate-400">
                   ¥{(product.default_price ?? 0).toLocaleString()}
                 </span>
@@ -152,6 +157,10 @@ export function ShoppingScreen() {
 
       {isAddFormOpen && (
         <AddProductForm onClose={() => setIsAddFormOpen(false)} onSubmit={addFavoriteProduct} />
+      )}
+
+      {historyProduct && (
+        <ProductHistoryModal product={historyProduct} onClose={() => setHistoryProduct(null)} />
       )}
     </div>
   )
