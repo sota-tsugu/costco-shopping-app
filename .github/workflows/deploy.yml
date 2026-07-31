@@ -1,0 +1,52 @@
+name: Deploy to GitHub Pages
+
+# mainブランチにpushされるたびに、自動でビルド(コードを実際に動く
+# 形に変換すること)して、GitHub Pagesへ公開する。
+# 手動で実行したいときのために workflow_dispatch も付けておく。
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: リポジトリのコードを取得
+        uses: actions/checkout@v4
+
+      - name: Node.jsをセットアップ
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 依存パッケージをインストール
+        run: npm install
+
+      - name: ビルド
+        run: npm run build
+
+      - name: ビルド成果物をアップロード
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: GitHub Pagesへデプロイ
+        id: deployment
+        uses: actions/deploy-pages@v4
