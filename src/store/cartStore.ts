@@ -74,6 +74,7 @@ type CartState = {
     amount: number | null,
     unit: string | null,
   ) => Promise<void>
+  updateProductPrice: (productId: number, price: number) => Promise<void>
   completeCheckout: () => Promise<void>
 }
 
@@ -288,6 +289,22 @@ export const useCartStore = create<CartState>((set, get) => ({
 
     await dbClient.persist()
     set((state) => ({ favorites: [newProduct, ...state.favorites] }))
+  },
+
+  /**
+   * 店頭で価格が変わっていた場合に、定番棚の「現在の価格」を更新する。
+   * 過去の購入履歴(Purchaseテーブルの行)は書き換えない
+   * (「履歴を編集できない設計にしない」という企画書の絶対ルールとは別で、
+   * これは新しい価格情報の登録であり、過去の記録の改変ではないため)。
+   */
+  async updateProductPrice(productId: number, price: number) {
+    await dbClient.run('UPDATE product SET default_price = ? WHERE id = ?', [price, productId])
+    await dbClient.persist()
+    set((state) => ({
+      favorites: state.favorites.map((p) =>
+        p.id === productId ? { ...p, default_price: price } : p,
+      ),
+    }))
   },
 
   async completeCheckout() {
