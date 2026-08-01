@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Minus, PlusCircle, CheckCircle2 } from 'lucide-react'
+import { Plus, Minus, PlusCircle, CheckCircle2, FlaskConical } from 'lucide-react'
 import { useCartStore, calcTotal, calcUnitPriceLabel, type Product } from '../store/cartStore'
 import { AddProductForm } from './AddProductForm'
 import { ProductHistoryModal } from './ProductHistoryModal'
@@ -20,10 +20,12 @@ export function ShoppingScreen() {
   const decrementFromCart = useCartStore((state) => state.decrementFromCart)
   const addFavoriteProduct = useCartStore((state) => state.addFavoriteProduct)
   const completeCheckout = useCartStore((state) => state.completeCheckout)
+  const seedSampleHistory = useCartStore((state) => state.seedSampleHistory)
 
   const [isAddFormOpen, setIsAddFormOpen] = useState(false)
   const [isCheckingOut, setIsCheckingOut] = useState(false)
   const [historyProduct, setHistoryProduct] = useState<Product | null>(null)
+  const [isSeeding, setIsSeeding] = useState(false)
 
   const total = calcTotal(cartItems)
   const progressRatio = budget > 0 ? Math.min(total / budget, 1) : 0
@@ -71,7 +73,25 @@ export function ShoppingScreen() {
 
       {/* マイ定番棚 */}
       <main className="mx-auto max-w-md p-4">
-        <h2 className="mb-3 font-semibold text-slate-800">マイ定番棚</h2>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="font-semibold text-slate-800">マイ定番棚</h2>
+          {/* 【動作確認用・一時的なボタン】確認が終わったら削除予定 */}
+          <button
+            onClick={async () => {
+              setIsSeeding(true)
+              try {
+                await seedSampleHistory()
+              } finally {
+                setIsSeeding(false)
+              }
+            }}
+            disabled={isSeeding}
+            className="flex items-center gap-1 text-xs text-slate-400 underline disabled:opacity-50"
+          >
+            <FlaskConical className="h-3 w-3" />
+            {isSeeding ? '作成中…' : 'テスト用サンプル履歴を追加'}
+          </button>
+        </div>
 
         {favorites.length === 0 && (
           <p className="mb-4 rounded-xl bg-white p-4 text-sm text-slate-400 shadow-sm">

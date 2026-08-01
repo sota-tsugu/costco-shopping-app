@@ -43,6 +43,8 @@ STEP1(フェーズ1-a)で行ったこと:
 
 まだ実装していないもの(フェーズ1-b残り・以降):
 - 事前買い物予定リスト(Wishlist)、ProductAlias(表記ゆれ吸収)
+
+**【一時的な動作確認用コード・要削除】** `cartStore.ts`の`seedSampleHistory`と、`ShoppingScreen.tsx`の「テスト用サンプル履歴を追加」ボタンは、過去価格比較・購入頻度表示の動作確認のために追加した一時的なコード。SOTAさんの確認が終わったら削除すること。
 - 事前買い物予定リスト(Wishlist)、ProductAlias(表記ゆれ吸収)
 - 複数店舗対応(Store)、家族メンバー対応(FamilyMember)、シンプル/パワーユーザーモード切り替え
 

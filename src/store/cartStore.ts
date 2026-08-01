@@ -76,6 +76,8 @@ type CartState = {
   ) => Promise<void>
   updateProductPrice: (productId: number, price: number) => Promise<void>
   completeCheckout: () => Promise<void>
+  /** 動作確認用のサンプル購入履歴を作る(開発用。後で削除予定) */
+  seedSampleHistory: () => Promise<void>
 }
 
 /** 現在のカート内合計金額を計算する(メモリ上の状態だけで完結、高速) */
@@ -329,5 +331,68 @@ export const useCartStore = create<CartState>((set, get) => ({
     await dbClient.persist()
 
     set({ screen: 'budget-setup', tripId: null, budget: 0, cartItems: {} })
+  },
+
+  /**
+   * 【動作確認用・一時的な機能】過去価格比較・購入頻度の表示が正しく動くか
+   * 確認できるよう、サンプルの商品と過去の購入履歴(完了済みトリップ)を
+   * まとめて作成する。実際の買い物データではないので、確認が終わったら
+   * この機能自体をコードから削除する予定。
+   */
+  async seedSampleHistory() {
+    const SAMPLE_NAME = 'サンプル商品(単価比較テスト用)'
+    const daysAgoIso = (days: number) => {
+      const date = new Date()
+      date.setDate(date.getDate() - days)
+      return date.toISOString()
+    }
+
+    // 既にサンプル商品があれば使い回す(二重登録を防ぐ)
+    const existingResult = await dbClient.exec('SELECT id FROM product WHERE name = ?', [
+      SAMPLE_NAME,
+    ])
+    const existingRows = rowsToObjects<{ id: number }>(existingResult)
+
+    let productId: number
+    if (existingRows.length > 0) {
+      productId = existingRows[0].id
+      await dbClient.run(
+        'UPDATE product SET default_price = 2080, amount = 1000, unit = ?, is_favorite = 1 WHERE id = ?',
+        ['g', productId],
+      )
+    } else {
+      await dbClient.run(
+        "INSERT INTO product (name, default_price, amount, unit, is_favorite, created_at) VALUES (?, 2080, 1000, 'g', 1, ?)",
+        [SAMPLE_NAME, daysAgoIso(0)],
+      )
+      const idResult = await dbClient.exec('SELECT last_insert_rowid() AS id')
+      productId = rowsToObjects<{ id: number }>(idResult)[0].id
+    }
+
+    // 少しずつ値上がりしていく4回分の購入履歴(35日前・24日前・15日前・6日前)
+    const samplePurchases = [
+      { daysAgo: 35, price: 1780 },
+      { daysAgo: 24, price: 1780 },
+      { daysAgo: 15, price: 1980 },
+      { daysAgo: 6, price: 2080 },
+    ]
+
+    for (const sample of samplePurchases) {
+      const timestamp = daysAgoIso(sample.daysAgo)
+      await dbClient.run(
+        "INSERT INTO shopping_trip (budget, status, started_at, completed_at, actual_total) VALUES (?, 'completed', ?, ?, ?)",
+        [sample.price, timestamp, timestamp, sample.price],
+      )
+      const tripIdResult = await dbClient.exec('SELECT last_insert_rowid() AS id')
+      const tripId = rowsToObjects<{ id: number }>(tripIdResult)[0].id
+
+      await dbClient.run(
+        "INSERT INTO purchase (product_id, trip_id, price, quantity, amount, unit, created_at) VALUES (?, ?, ?, 1, 1000, 'g', ?)",
+        [productId, tripId, sample.price, timestamp],
+      )
+    }
+
+    await dbClient.persist()
+    await get().init()
   },
 }))
