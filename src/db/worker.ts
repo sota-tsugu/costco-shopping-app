@@ -91,6 +91,15 @@ const MIGRATIONS: Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_purchase_trip ON purchase(trip_id);`,
     ],
   },
+  {
+    version: 3,
+    description:
+      'フェーズ1-b: Purchaseに購入時点の内容量・単位を記録する列を追加(単位あたり単価の比較を正しく行うため)',
+    statements: [
+      `ALTER TABLE purchase ADD COLUMN amount REAL;`,
+      `ALTER TABLE purchase ADD COLUMN unit TEXT;`,
+    ],
+  },
 ]
 
 function runMigrations(database: Database) {

@@ -209,9 +209,13 @@ export const useCartStore = create<CartState>((set, get) => ({
 
       if (currentItem.purchaseId === null) {
         const now = new Date().toISOString()
+        // 購入時点の内容量・単位もあわせて記録しておく。
+        // 後からパッケージサイズが変わっても、単位あたり単価の比較を
+        // 正しく行えるようにするため(商品マスター側の現在値ではなく
+        // 購入時点のスナップショットを使う)。
         await dbClient.run(
-          'INSERT INTO purchase (product_id, trip_id, price, quantity, created_at) VALUES (?, ?, ?, ?, ?)',
-          [product.id, tripId, price, currentItem.quantity, now],
+          'INSERT INTO purchase (product_id, trip_id, price, quantity, amount, unit, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [product.id, tripId, price, currentItem.quantity, product.amount, product.unit, now],
         )
         const idResult = await dbClient.exec('SELECT last_insert_rowid() AS id')
         const [{ id: purchaseId }] = rowsToObjects<{ id: number }>(idResult)

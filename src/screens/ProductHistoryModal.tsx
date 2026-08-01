@@ -6,11 +6,18 @@ import { useCartStore, type Product } from '../store/cartStore'
 // 商品名をタップすると開く、過去の購入履歴・購入頻度・価格比較の確認画面。
 // 「今回の買い物(進行中のカート)」は含めず、会計が完了したトリップの
 // 記録だけを対象にする(まだ買ってもいないものを履歴に含めないため)。
+//
+// 価格の比較は「支払った金額そのもの」ではなく、できる限り
+// 「内容量あたりの単価」で行う。パッケージサイズが変わることがあるため、
+// 内容量・単位は商品マスターの現在値ではなく、購入した時点の値を
+// Purchaseテーブルにスナップショットとして記録している(cartStore.ts参照)。
 
 type PurchaseHistoryRow = {
   created_at: string
   price: number
   quantity: number
+  amount: number | null
+  unit: string | null
 }
 
 type Props = {
@@ -18,10 +25,43 @@ type Props = {
   onClose: () => void
 }
 
+type ComparableValue = {
+  /** 単位あたり単価ならその値、単価計算ができない場合は支払い価格そのもの */
+  value: number
+  /** 単位あたり単価の場合の単位(例: "g")。支払い価格そのものの場合はnull */
+  unitLabel: string | null
+}
+
+/** 内容量・単位が分かれば単位あたり単価を、分からなければ価格そのものを比較値として使う */
+function toComparableValue(row: { price: number; amount: number | null; unit: string | null }): ComparableValue {
+  if (row.amount && row.amount > 0 && row.unit) {
+    return { value: row.price / row.amount, unitLabel: row.unit }
+  }
+  return { value: row.price, unitLabel: null }
+}
+
+/** 単位が一致する場合だけ比較する(gとmlのように単位が違うものは比較しない) */
+function diffComparableValues(current: ComparableValue, previous: ComparableValue) {
+  if (current.unitLabel !== previous.unitLabel) return null
+  return { diff: current.value - previous.value, unitLabel: current.unitLabel }
+}
+
+function formatComparable({ value, unitLabel }: ComparableValue): string {
+  const formatted = value.toLocaleString(undefined, {
+    maximumFractionDigits: unitLabel ? 2 : 0,
+  })
+  return unitLabel ? `¥${formatted}/${unitLabel}` : `¥${formatted}`
+}
+
 /** 値上がり/値下がりのバッジ(価格差がなければ何も表示しない) */
-function PriceDiffBadge({ diff }: { diff: number }) {
-  if (diff === 0) return null
-  const isUp = diff > 0
+function PriceDiffBadge({ diff, unitLabel }: { diff: number; unitLabel: string | null }) {
+  // 小数計算の誤差で±0.01のような無意味な差が出るのを防ぐ
+  const rounded = unitLabel ? Math.round(diff * 100) / 100 : Math.round(diff)
+  if (rounded === 0) return null
+  const isUp = rounded > 0
+  const displayValue = Math.abs(rounded).toLocaleString(undefined, {
+    maximumFractionDigits: unitLabel ? 2 : 0,
+  })
   return (
     <span
       className={`inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-xs font-bold ${
@@ -29,7 +69,8 @@ function PriceDiffBadge({ diff }: { diff: number }) {
       }`}
     >
       {isUp ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}¥
-      {Math.abs(diff).toLocaleString()}
+      {displayValue}
+      {unitLabel ? `/${unitLabel}` : ''}
     </span>
   )
 }
@@ -49,7 +90,8 @@ export function ProductHistoryModal({ product, onClose }: Props) {
     async function load() {
       try {
         const result = await dbClient.exec(
-          `SELECT purchase.created_at AS created_at, purchase.price AS price, purchase.quantity AS quantity
+          `SELECT purchase.created_at AS created_at, purchase.price AS price,
+                  purchase.quantity AS quantity, purchase.amount AS amount, purchase.unit AS unit
            FROM purchase
            JOIN shopping_trip ON purchase.trip_id = shopping_trip.id
            WHERE purchase.product_id = ? AND shopping_trip.status = 'completed'
@@ -90,11 +132,17 @@ export function ProductHistoryModal({ product, onClose }: Props) {
     return Math.round(avg)
   })()
 
-  // 「今の価格」と直近の購入価格を比較する
-  const latestHistoricalPrice = rows && rows.length > 0 ? rows[0].price : null
-  const currentPrice = product.default_price ?? 0
-  const currentVsLatestDiff =
-    latestHistoricalPrice !== null ? currentPrice - latestHistoricalPrice : null
+  // 「今の価格」と直近の購入(単位あたり単価)を比較する。
+  // 今の内容量・単位を使うのは、これから追加する場合の見込みだから。
+  const currentComparable = toComparableValue({
+    price: product.default_price ?? 0,
+    amount: product.amount,
+    unit: product.unit,
+  })
+  const latestRow = rows && rows.length > 0 ? rows[0] : null
+  const currentVsLatestDiff = latestRow
+    ? diffComparableValues(currentComparable, toComparableValue(latestRow))
+    : null
 
   async function handleSavePrice() {
     const newPrice = Number(priceInput)
@@ -145,22 +193,32 @@ export function ProductHistoryModal({ product, onClose }: Props) {
               </button>
             </div>
           ) : (
-            <div className="flex items-center gap-2">
-              <span className="text-lg font-bold text-slate-800">
-                ¥{currentPrice.toLocaleString()}
-              </span>
-              {currentVsLatestDiff !== null && <PriceDiffBadge diff={currentVsLatestDiff} />}
-              <button
-                onClick={() => {
-                  setPriceInput(String(product.default_price ?? ''))
-                  setIsEditingPrice(true)
-                }}
-                className="ml-auto flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 text-xs text-slate-600"
-              >
-                <Pencil className="h-3 w-3" />
-                価格を修正
-              </button>
-            </div>
+            <>
+              <div className="flex items-center gap-2">
+                <span className="text-lg font-bold text-slate-800">
+                  ¥{(product.default_price ?? 0).toLocaleString()}
+                </span>
+                {currentComparable.unitLabel && (
+                  <span className="text-xs text-blue-700">{formatComparable(currentComparable)}</span>
+                )}
+                <button
+                  onClick={() => {
+                    setPriceInput(String(product.default_price ?? ''))
+                    setIsEditingPrice(true)
+                  }}
+                  className="ml-auto flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 text-xs text-slate-600"
+                >
+                  <Pencil className="h-3 w-3" />
+                  価格を修正
+                </button>
+              </div>
+              {currentVsLatestDiff && (
+                <div className="mt-1 flex items-center gap-1 text-xs text-slate-500">
+                  前回の購入と比べて
+                  <PriceDiffBadge diff={currentVsLatestDiff.diff} unitLabel={currentVsLatestDiff.unitLabel} />
+                </div>
+              )}
+            </>
           )}
         </div>
 
@@ -197,22 +255,34 @@ export function ProductHistoryModal({ product, onClose }: Props) {
             <ul className="space-y-2">
               {rows.map((row, index) => {
                 const olderRow = rows[index + 1] // 1つ前(時系列で古い方)の購入
-                const diff = olderRow ? row.price - olderRow.price : 0
+                const rowComparable = toComparableValue(row)
+                const diffResult = olderRow
+                  ? diffComparableValues(rowComparable, toComparableValue(olderRow))
+                  : null
 
                 return (
                   <li
                     key={index}
-                    className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                    className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
                   >
-                    <span className="text-slate-600">
-                      {new Date(row.created_at).toLocaleDateString('ja-JP')}
-                    </span>
-                    <span className="flex items-center gap-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-600">
+                        {new Date(row.created_at).toLocaleDateString('ja-JP')}
+                      </span>
                       <span className="text-slate-800">
                         ¥{row.price.toLocaleString()} × {row.quantity}
                       </span>
-                      {olderRow && <PriceDiffBadge diff={diff} />}
-                    </span>
+                    </div>
+                    {(rowComparable.unitLabel || diffResult) && (
+                      <div className="mt-1 flex items-center justify-end gap-2 text-xs">
+                        {rowComparable.unitLabel && (
+                          <span className="text-blue-700">{formatComparable(rowComparable)}</span>
+                        )}
+                        {diffResult && (
+                          <PriceDiffBadge diff={diffResult.diff} unitLabel={diffResult.unitLabel} />
+                        )}
+                      </div>
+                    )}
                   </li>
                 )
               })}
