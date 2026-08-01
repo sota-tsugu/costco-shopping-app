@@ -54,6 +54,19 @@ export type CartItem = {
   quantity: number
 }
 
+/**
+ * 事前買い物予定リストの項目。自宅で自由入力した「仮の商品名」を保持する。
+ * product_idは今のところ常にnull(店内でカートに追加する瞬間に商品を
+ * 決める設計のため)。将来ProductAlias(表記ゆれ吸収)を実装したら、
+ * 一度紐付けた組み合わせを記憶して自動候補に使う想定。
+ */
+export type WishlistItem = {
+  id: number
+  raw_name: string
+  product_id: number | null
+  created_at: string
+}
+
 type Screen = 'loading' | 'budget-setup' | 'shopping'
 
 type CartState = {
@@ -62,6 +75,7 @@ type CartState = {
   budget: number
   favorites: Product[]
   cartItems: Record<number, CartItem> // key: productId
+  wishlist: WishlistItem[]
   errorMessage: string | null
 
   init: () => Promise<void>
@@ -76,8 +90,10 @@ type CartState = {
   ) => Promise<void>
   updateProductPrice: (productId: number, price: number) => Promise<void>
   completeCheckout: () => Promise<void>
-  /** 動作確認用のサンプル購入履歴を作る(開発用。後で削除予定) */
-  seedSampleHistory: () => Promise<void>
+  addWishlistItem: (rawName: string) => Promise<void>
+  removeWishlistItem: (wishlistId: number) => Promise<void>
+  /** 事前リストの項目を商品に紐付け、カートに追加してリストから外す */
+  resolveWishlistItem: (wishlistId: number, product: Product) => void
 }
 
 /** 現在のカート内合計金額を計算する(メモリ上の状態だけで完結、高速) */
@@ -103,6 +119,7 @@ export const useCartStore = create<CartState>((set, get) => ({
   budget: 0,
   favorites: [],
   cartItems: {},
+  wishlist: [],
   errorMessage: null,
 
   async init() {
@@ -114,13 +131,18 @@ export const useCartStore = create<CartState>((set, get) => ({
       )
       const favorites = rowsToObjects<Product>(favoritesResult)
 
+      const wishlistResult = await dbClient.exec(
+        'SELECT id, raw_name, product_id, created_at FROM wishlist ORDER BY id ASC',
+      )
+      const wishlist = rowsToObjects<WishlistItem>(wishlistResult)
+
       const tripResult = await dbClient.exec(
         "SELECT id, budget FROM shopping_trip WHERE status = 'active' ORDER BY id DESC LIMIT 1",
       )
       const trips = rowsToObjects<{ id: number; budget: number }>(tripResult)
 
       if (trips.length === 0) {
-        set({ screen: 'budget-setup', favorites, tripId: null, cartItems: {} })
+        set({ screen: 'budget-setup', favorites, wishlist, tripId: null, cartItems: {} })
         return
       }
 
@@ -158,6 +180,7 @@ export const useCartStore = create<CartState>((set, get) => ({
         tripId: trip.id,
         budget: trip.budget,
         favorites,
+        wishlist,
         cartItems,
       })
     } catch (error) {
@@ -333,66 +356,42 @@ export const useCartStore = create<CartState>((set, get) => ({
     set({ screen: 'budget-setup', tripId: null, budget: 0, cartItems: {} })
   },
 
-  /**
-   * 【動作確認用・一時的な機能】過去価格比較・購入頻度の表示が正しく動くか
-   * 確認できるよう、サンプルの商品と過去の購入履歴(完了済みトリップ)を
-   * まとめて作成する。実際の買い物データではないので、確認が終わったら
-   * この機能自体をコードから削除する予定。
-   */
-  async seedSampleHistory() {
-    const SAMPLE_NAME = 'サンプル商品(単価比較テスト用)'
-    const daysAgoIso = (days: number) => {
-      const date = new Date()
-      date.setDate(date.getDate() - days)
-      return date.toISOString()
-    }
+  /** 事前買い物予定リストに項目を追加する(自宅での自由入力を想定) */
+  async addWishlistItem(rawName: string) {
+    const trimmed = rawName.trim()
+    if (trimmed.length === 0) return
 
-    // 既にサンプル商品があれば使い回す(二重登録を防ぐ)
-    const existingResult = await dbClient.exec('SELECT id FROM product WHERE name = ?', [
-      SAMPLE_NAME,
+    const now = new Date().toISOString()
+    await dbClient.run('INSERT INTO wishlist (raw_name, created_at) VALUES (?, ?)', [
+      trimmed,
+      now,
     ])
-    const existingRows = rowsToObjects<{ id: number }>(existingResult)
-
-    let productId: number
-    if (existingRows.length > 0) {
-      productId = existingRows[0].id
-      await dbClient.run(
-        'UPDATE product SET default_price = 2080, amount = 1000, unit = ?, is_favorite = 1 WHERE id = ?',
-        ['g', productId],
-      )
-    } else {
-      await dbClient.run(
-        "INSERT INTO product (name, default_price, amount, unit, is_favorite, created_at) VALUES (?, 2080, 1000, 'g', 1, ?)",
-        [SAMPLE_NAME, daysAgoIso(0)],
-      )
-      const idResult = await dbClient.exec('SELECT last_insert_rowid() AS id')
-      productId = rowsToObjects<{ id: number }>(idResult)[0].id
-    }
-
-    // 少しずつ値上がりしていく4回分の購入履歴(35日前・24日前・15日前・6日前)
-    const samplePurchases = [
-      { daysAgo: 35, price: 1780 },
-      { daysAgo: 24, price: 1780 },
-      { daysAgo: 15, price: 1980 },
-      { daysAgo: 6, price: 2080 },
-    ]
-
-    for (const sample of samplePurchases) {
-      const timestamp = daysAgoIso(sample.daysAgo)
-      await dbClient.run(
-        "INSERT INTO shopping_trip (budget, status, started_at, completed_at, actual_total) VALUES (?, 'completed', ?, ?, ?)",
-        [sample.price, timestamp, timestamp, sample.price],
-      )
-      const tripIdResult = await dbClient.exec('SELECT last_insert_rowid() AS id')
-      const tripId = rowsToObjects<{ id: number }>(tripIdResult)[0].id
-
-      await dbClient.run(
-        "INSERT INTO purchase (product_id, trip_id, price, quantity, amount, unit, created_at) VALUES (?, ?, ?, 1, 1000, 'g', ?)",
-        [productId, tripId, sample.price, timestamp],
-      )
-    }
+    const idResult = await dbClient.exec('SELECT last_insert_rowid() AS id')
+    const [{ id }] = rowsToObjects<{ id: number }>(idResult)
 
     await dbClient.persist()
-    await get().init()
+    set((state) => ({
+      wishlist: [...state.wishlist, { id, raw_name: trimmed, product_id: null, created_at: now }],
+    }))
+  },
+
+  /** 事前買い物予定リストから項目を削除する(入力ミスの取り消しなど) */
+  async removeWishlistItem(wishlistId: number) {
+    await dbClient.run('DELETE FROM wishlist WHERE id = ?', [wishlistId])
+    await dbClient.persist()
+    set((state) => ({ wishlist: state.wishlist.filter((w) => w.id !== wishlistId) }))
+  },
+
+  /**
+   * 事前リストの項目(自宅で入力した仮の商品名)を、商品マスターの
+   * 実際の商品に紐付けてカートに追加し、リストから取り除く。
+   * 「商品名が完全一致していれば自動で紐付ける」方針のため、
+   * 一致しない場合はSOTAさんに商品を選んでもらう画面を別途表示する
+   * (ShoppingScreen側で制御)。
+   */
+  resolveWishlistItem(wishlistId, product) {
+    get().addToCart(product)
+    // 裏側の削除は待たず、画面上のリストからは即座に消す
+    void get().removeWishlistItem(wishlistId)
   },
 }))

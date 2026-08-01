@@ -100,6 +100,18 @@ const MIGRATIONS: Migration[] = [
       `ALTER TABLE purchase ADD COLUMN unit TEXT;`,
     ],
   },
+  {
+    version: 4,
+    description: 'フェーズ1-b: 事前買い物予定リスト(Wishlist)テーブルを追加',
+    statements: [
+      `CREATE TABLE IF NOT EXISTS wishlist (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        raw_name TEXT NOT NULL,
+        product_id INTEGER REFERENCES product(id),
+        created_at TEXT NOT NULL
+      );`,
+    ],
+  },
 ]
 
 function runMigrations(database: Database) {

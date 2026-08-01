@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { Plus, Minus, PlusCircle, CheckCircle2, FlaskConical } from 'lucide-react'
-import { useCartStore, calcTotal, calcUnitPriceLabel, type Product } from '../store/cartStore'
+import { Plus, Minus, PlusCircle, CheckCircle2, ClipboardList } from 'lucide-react'
+import { useCartStore, calcTotal, calcUnitPriceLabel, type Product, type WishlistItem } from '../store/cartStore'
 import { AddProductForm } from './AddProductForm'
 import { ProductHistoryModal } from './ProductHistoryModal'
+import { WishlistMatchModal } from './WishlistMatchModal'
 
 // 買い物中のメイン画面。
 // UI/UXの4原則(企画書 6章)を意識したレイアウト:
@@ -16,21 +17,38 @@ export function ShoppingScreen() {
   const budget = useCartStore((state) => state.budget)
   const favorites = useCartStore((state) => state.favorites)
   const cartItems = useCartStore((state) => state.cartItems)
+  const wishlist = useCartStore((state) => state.wishlist)
   const addToCart = useCartStore((state) => state.addToCart)
   const decrementFromCart = useCartStore((state) => state.decrementFromCart)
   const addFavoriteProduct = useCartStore((state) => state.addFavoriteProduct)
   const completeCheckout = useCartStore((state) => state.completeCheckout)
-  const seedSampleHistory = useCartStore((state) => state.seedSampleHistory)
+  const resolveWishlistItem = useCartStore((state) => state.resolveWishlistItem)
+  const removeWishlistItem = useCartStore((state) => state.removeWishlistItem)
 
   const [isAddFormOpen, setIsAddFormOpen] = useState(false)
   const [isCheckingOut, setIsCheckingOut] = useState(false)
   const [historyProduct, setHistoryProduct] = useState<Product | null>(null)
-  const [isSeeding, setIsSeeding] = useState(false)
+  const [matchingWishlistItem, setMatchingWishlistItem] = useState<WishlistItem | null>(null)
+  const [prefillNameForNewProduct, setPrefillNameForNewProduct] = useState<string | null>(null)
+  const [wishlistIdToResolve, setWishlistIdToResolve] = useState<number | null>(null)
 
   const total = calcTotal(cartItems)
   const progressRatio = budget > 0 ? Math.min(total / budget, 1) : 0
   const isOverBudget = total > budget
   const cartItemCount = Object.values(cartItems).reduce((sum, item) => sum + item.quantity, 0)
+
+  function handleWishlistTap(item: WishlistItem) {
+    // 「トイペ」のような自由入力の名前と、定番棚の商品名が完全一致すれば
+    // 自動で紐付けてカートに追加する。一致しなければ選択画面を開く。
+    const normalizedRawName = item.raw_name.trim().toLowerCase()
+    const matched = favorites.find((p) => p.name.trim().toLowerCase() === normalizedRawName)
+
+    if (matched) {
+      resolveWishlistItem(item.id, matched)
+    } else {
+      setMatchingWishlistItem(item)
+    }
+  }
 
   async function handleCheckout() {
     const confirmed = window.confirm(
@@ -43,6 +61,30 @@ export function ShoppingScreen() {
       await completeCheckout()
     } finally {
       setIsCheckingOut(false)
+    }
+  }
+
+  function handleCloseAddForm() {
+    setIsAddFormOpen(false)
+    setPrefillNameForNewProduct(null)
+    setWishlistIdToResolve(null)
+  }
+
+  async function handleAddProductSubmit(
+    name: string,
+    price: number,
+    amount: number | null,
+    unit: string | null,
+  ) {
+    await addFavoriteProduct(name, price, amount, unit)
+    // 事前リストの「新しい商品として登録する」経由の場合は、
+    // 今できたばかりの商品(favoritesの先頭に追加される)をそのままカートへ
+    if (wishlistIdToResolve !== null) {
+      const newest = useCartStore.getState().favorites[0]
+      if (newest) {
+        resolveWishlistItem(wishlistIdToResolve, newest)
+      }
+      setWishlistIdToResolve(null)
     }
   }
 
@@ -71,27 +113,42 @@ export function ShoppingScreen() {
         </div>
       </header>
 
-      {/* マイ定番棚 */}
       <main className="mx-auto max-w-md p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="font-semibold text-slate-800">マイ定番棚</h2>
-          {/* 【動作確認用・一時的なボタン】確認が終わったら削除予定 */}
-          <button
-            onClick={async () => {
-              setIsSeeding(true)
-              try {
-                await seedSampleHistory()
-              } finally {
-                setIsSeeding(false)
-              }
-            }}
-            disabled={isSeeding}
-            className="flex items-center gap-1 text-xs text-slate-400 underline disabled:opacity-50"
-          >
-            <FlaskConical className="h-3 w-3" />
-            {isSeeding ? '作成中…' : 'テスト用サンプル履歴を追加'}
-          </button>
-        </div>
+        {/* 事前買い物予定リスト(自宅で入力したものを、ここでタップして紐付ける) */}
+        {wishlist.length > 0 && (
+          <section className="mb-5">
+            <h2 className="mb-2 flex items-center gap-1.5 font-semibold text-slate-800">
+              <ClipboardList className="h-4 w-4 text-blue-700" />
+              事前リストから追加
+            </h2>
+            <ul className="space-y-2">
+              {wishlist.map((item) => (
+                <li
+                  key={item.id}
+                  className="flex items-center gap-2 rounded-xl bg-white p-3 shadow-sm"
+                >
+                  <button
+                    onClick={() => handleWishlistTap(item)}
+                    className="flex flex-1 items-center gap-2 text-left text-sm font-medium text-slate-800"
+                  >
+                    <Plus className="h-4 w-4 shrink-0 text-blue-700" />
+                    {item.raw_name}
+                  </button>
+                  <button
+                    onClick={() => removeWishlistItem(item.id)}
+                    className="shrink-0 px-1 text-xs text-slate-300"
+                    aria-label="リストから削除"
+                  >
+                    ×
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {/* マイ定番棚 */}
+        <h2 className="mb-3 font-semibold text-slate-800">マイ定番棚</h2>
 
         {favorites.length === 0 && (
           <p className="mb-4 rounded-xl bg-white p-4 text-sm text-slate-400 shadow-sm">
@@ -176,11 +233,33 @@ export function ShoppingScreen() {
       </div>
 
       {isAddFormOpen && (
-        <AddProductForm onClose={() => setIsAddFormOpen(false)} onSubmit={addFavoriteProduct} />
+        <AddProductForm
+          onClose={handleCloseAddForm}
+          onSubmit={handleAddProductSubmit}
+          initialName={prefillNameForNewProduct ?? undefined}
+        />
       )}
 
       {historyProduct && (
         <ProductHistoryModal product={historyProduct} onClose={() => setHistoryProduct(null)} />
+      )}
+
+      {matchingWishlistItem && (
+        <WishlistMatchModal
+          wishlistItem={matchingWishlistItem}
+          favorites={favorites}
+          onClose={() => setMatchingWishlistItem(null)}
+          onPickExisting={(product) => {
+            resolveWishlistItem(matchingWishlistItem.id, product)
+            setMatchingWishlistItem(null)
+          }}
+          onCreateNew={() => {
+            setPrefillNameForNewProduct(matchingWishlistItem.raw_name)
+            setWishlistIdToResolve(matchingWishlistItem.id)
+            setMatchingWishlistItem(null)
+            setIsAddFormOpen(true)
+          }}
+        />
       )}
     </div>
   )

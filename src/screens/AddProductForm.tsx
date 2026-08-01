@@ -19,10 +19,12 @@ const UNIT_OPTIONS = [
 type Props = {
   onClose: () => void
   onSubmit: (name: string, price: number, amount: number | null, unit: string | null) => Promise<void>
+  /** 事前リストから登録する場合など、商品名をあらかじめ入力しておきたい時に使う */
+  initialName?: string
 }
 
-export function AddProductForm({ onClose, onSubmit }: Props) {
-  const [name, setName] = useState('')
+export function AddProductForm({ onClose, onSubmit, initialName }: Props) {
+  const [name, setName] = useState(initialName ?? '')
   const [price, setPrice] = useState('')
   const [amount, setAmount] = useState('')
   const [unit, setUnit] = useState('')
