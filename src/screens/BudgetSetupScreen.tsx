@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react'
-import { ShoppingCart, Loader2, ClipboardList, Plus, X, Check } from 'lucide-react'
-import { useCartStore } from '../store/cartStore'
+import { useEffect, useMemo, useState } from 'react'
+import { ShoppingCart, Loader2, ClipboardList, Plus, X, Check, ChevronDown, Search } from 'lucide-react'
+import { useCartStore, type Product } from '../store/cartStore'
+import { toComparableValue, diffComparableValues } from '../utils/priceCompare'
+import { PriceDiffBadge } from '../components/PriceDiffBadge'
 
 // 買い物を始める前に、今回の予算と「今回買う予定のもの」を確認する画面。
 // 企画書の方針により「予算は買い物1回ごと」に設定する形にしている。
@@ -23,6 +25,7 @@ export function BudgetSetupScreen() {
   const wishlist = useCartStore((state) => state.wishlist)
   const addWishlistItem = useCartStore((state) => state.addWishlistItem)
   const removeWishlistItem = useCartStore((state) => state.removeWishlistItem)
+  const purchaseSummaryByProduct = useCartStore((state) => state.purchaseSummaryByProduct)
 
   const [budgetInput, setBudgetInput] = useState('30000')
   const [isStarting, setIsStarting] = useState(false)
@@ -48,6 +51,53 @@ export function BudgetSetupScreen() {
       }
       return next
     })
+  }
+
+  // リストが長くなっても見つけやすいよう、よく買う(購入回数が多い)順に
+  // 並べ替える。初めて登録したばかりでまだ購入履歴がない商品は末尾に。
+  const sortedFavorites = useMemo(() => {
+    return [...favorites].sort((a, b) => {
+      const countA = purchaseSummaryByProduct[a.id]?.count ?? 0
+      const countB = purchaseSummaryByProduct[b.id]?.count ?? 0
+      return countB - countA
+    })
+  }, [favorites, purchaseSummaryByProduct])
+
+  // 【今回買う予定リストの折りたたみ・検索】リストが長くなる想定のため、
+  // 初期状態では折りたたんでおき「◯点中◯点選択中」の要約だけ見せる。
+  // 開いた時だけ検索欄で絞り込みながら全件を確認できるようにしている。
+  const [isPlanListExpanded, setIsPlanListExpanded] = useState(false)
+  const [planListQuery, setPlanListQuery] = useState('')
+  const checkedCount = checkedIds ? checkedIds.size : favorites.length
+
+  const visibleFavorites = useMemo(() => {
+    if (planListQuery.trim().length === 0) return sortedFavorites
+    const q = planListQuery.trim().toLowerCase()
+    return sortedFavorites.filter((p) => p.name.toLowerCase().includes(q))
+  }, [sortedFavorites, planListQuery])
+
+  function selectAll() {
+    setCheckedIds(new Set(favorites.map((p) => p.id)))
+  }
+  function selectNone() {
+    setCheckedIds(new Set())
+  }
+
+  /** 「前回 ¥◯◯」の表示用に、現在価格と前回購入価格の差分を求める */
+  function getLastPriceDiff(product: Product) {
+    const summary = purchaseSummaryByProduct[product.id]
+    if (!summary) return null
+    const current = toComparableValue({
+      price: product.default_price ?? 0,
+      amount: product.amount,
+      unit: product.unit,
+    })
+    const last = toComparableValue({
+      price: summary.lastPrice,
+      amount: summary.lastAmount,
+      unit: summary.lastUnit,
+    })
+    return { last, diff: diffComparableValues(current, last) }
   }
 
   async function handleStart() {
@@ -111,34 +161,97 @@ export function BudgetSetupScreen() {
         {/* 今回買う予定(マイ定番棚のチェックリスト) */}
         {favorites.length > 0 && (
           <div className="mt-6 rounded-2xl bg-white p-6 shadow-sm">
-            <h2 className="mb-1 font-semibold text-slate-800">今回買う予定</h2>
-            <p className="mb-4 text-xs text-slate-500">
-              マイ定番棚は最初から全部チェック済みです。今回いらないものだけ外してください。
-            </p>
-            <ul className="space-y-2">
-              {favorites.map((product) => {
-                const checked = checkedIds?.has(product.id) ?? true
-                return (
-                  <li key={product.id}>
-                    <button
-                      onClick={() => toggleChecked(product.id)}
-                      className="flex w-full items-center gap-3 rounded-lg border border-slate-200 px-3 py-2.5 text-left"
-                    >
-                      <span
-                        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 ${
-                          checked ? 'border-blue-700 bg-blue-700' : 'border-slate-300'
-                        }`}
-                      >
-                        {checked && <Check className="h-3.5 w-3.5 text-white" />}
-                      </span>
-                      <span className={`text-sm ${checked ? 'text-slate-800' : 'text-slate-400 line-through'}`}>
-                        {product.name}
-                      </span>
-                    </button>
-                  </li>
-                )
-              })}
-            </ul>
+            <button
+              onClick={() => setIsPlanListExpanded((v) => !v)}
+              className="flex w-full items-center justify-between"
+            >
+              <div className="text-left">
+                <h2 className="font-semibold text-slate-800">今回買う予定</h2>
+                <p className="text-xs text-slate-500">
+                  {favorites.length}点中{checkedCount}点選択中(不要なものだけ外してください)
+                </p>
+              </div>
+              <ChevronDown
+                className={`h-5 w-5 shrink-0 text-slate-400 transition-transform ${
+                  isPlanListExpanded ? 'rotate-180' : ''
+                }`}
+              />
+            </button>
+
+            {isPlanListExpanded && (
+              <div className="mt-4">
+                <div className="relative mb-3">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={planListQuery}
+                    onChange={(e) => setPlanListQuery(e.target.value)}
+                    placeholder="商品名で絞り込み"
+                    className="w-full rounded-lg border border-slate-300 py-2 pl-9 pr-3 text-sm focus:border-blue-600 focus:outline-none"
+                  />
+                </div>
+
+                <div className="mb-3 flex gap-2">
+                  <button
+                    onClick={selectAll}
+                    className="flex-1 rounded-lg border border-slate-300 py-1.5 text-xs text-slate-600"
+                  >
+                    全部チェック
+                  </button>
+                  <button
+                    onClick={selectNone}
+                    className="flex-1 rounded-lg border border-slate-300 py-1.5 text-xs text-slate-600"
+                  >
+                    全部外す
+                  </button>
+                </div>
+
+                <ul className="max-h-[50vh] space-y-1 overflow-y-auto">
+                  {visibleFavorites.map((product) => {
+                    const checked = checkedIds?.has(product.id) ?? true
+                    const priceDiff = getLastPriceDiff(product)
+
+                    return (
+                      <li key={product.id}>
+                        <button
+                          onClick={() => toggleChecked(product.id)}
+                          className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-slate-50"
+                        >
+                          <span
+                            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 ${
+                              checked ? 'border-blue-700 bg-blue-700' : 'border-slate-300'
+                            }`}
+                          >
+                            {checked && <Check className="h-3.5 w-3.5 text-white" />}
+                          </span>
+                          <span
+                            className={`min-w-0 flex-1 truncate text-sm ${
+                              checked ? 'text-slate-800' : 'text-slate-400 line-through'
+                            }`}
+                          >
+                            {product.name}
+                          </span>
+                          <span className="shrink-0 text-right text-xs text-slate-400">
+                            ¥{(product.default_price ?? 0).toLocaleString()}
+                            {priceDiff && (
+                              <span className="ml-1 text-slate-400">
+                                前回¥{priceDiff.last.value.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                              </span>
+                            )}
+                          </span>
+                          {priceDiff?.diff && (
+                            <PriceDiffBadge diff={priceDiff.diff.diff} unitLabel={priceDiff.diff.unitLabel} />
+                          )}
+                        </button>
+                      </li>
+                    )
+                  })}
+                  {visibleFavorites.length === 0 && (
+                    <li className="py-4 text-center text-xs text-slate-400">見つかりませんでした</li>
+                  )}
+                </ul>
+              </div>
+            )}
           </div>
         )}
 

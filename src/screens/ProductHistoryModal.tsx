@@ -1,16 +1,16 @@
 import { useEffect, useState } from 'react'
-import { X, Loader2, History, Pencil, ArrowUp, ArrowDown, Check } from 'lucide-react'
+import { X, Loader2, History, Pencil, Check } from 'lucide-react'
 import { dbClient, rowsToObjects } from '../db/dbClient'
 import { useCartStore, type Product } from '../store/cartStore'
+import { toComparableValue, diffComparableValues, formatComparable } from '../utils/priceCompare'
+import { PriceDiffBadge } from '../components/PriceDiffBadge'
 
 // 商品名をタップすると開く、過去の購入履歴・購入頻度・価格比較の確認画面。
 // 「今回の買い物(進行中のカート)」は含めず、会計が完了したトリップの
 // 記録だけを対象にする(まだ買ってもいないものを履歴に含めないため)。
 //
-// 価格の比較は「支払った金額そのもの」ではなく、できる限り
-// 「内容量あたりの単価」で行う。パッケージサイズが変わることがあるため、
-// 内容量・単位は商品マスターの現在値ではなく、購入した時点の値を
-// Purchaseテーブルにスナップショットとして記録している(cartStore.ts参照)。
+// 価格比較のロジック(単位あたり単価での比較)は src/utils/priceCompare.ts
+// に共通化している(BudgetSetupScreenの「今回買う予定」リストでも使用)。
 
 type PurchaseHistoryRow = {
   created_at: string
@@ -23,56 +23,6 @@ type PurchaseHistoryRow = {
 type Props = {
   product: Product
   onClose: () => void
-}
-
-type ComparableValue = {
-  /** 単位あたり単価ならその値、単価計算ができない場合は支払い価格そのもの */
-  value: number
-  /** 単位あたり単価の場合の単位(例: "g")。支払い価格そのものの場合はnull */
-  unitLabel: string | null
-}
-
-/** 内容量・単位が分かれば単位あたり単価を、分からなければ価格そのものを比較値として使う */
-function toComparableValue(row: { price: number; amount: number | null; unit: string | null }): ComparableValue {
-  if (row.amount && row.amount > 0 && row.unit) {
-    return { value: row.price / row.amount, unitLabel: row.unit }
-  }
-  return { value: row.price, unitLabel: null }
-}
-
-/** 単位が一致する場合だけ比較する(gとmlのように単位が違うものは比較しない) */
-function diffComparableValues(current: ComparableValue, previous: ComparableValue) {
-  if (current.unitLabel !== previous.unitLabel) return null
-  return { diff: current.value - previous.value, unitLabel: current.unitLabel }
-}
-
-function formatComparable({ value, unitLabel }: ComparableValue): string {
-  const formatted = value.toLocaleString(undefined, {
-    maximumFractionDigits: unitLabel ? 2 : 0,
-  })
-  return unitLabel ? `¥${formatted}/${unitLabel}` : `¥${formatted}`
-}
-
-/** 値上がり/値下がりのバッジ(価格差がなければ何も表示しない) */
-function PriceDiffBadge({ diff, unitLabel }: { diff: number; unitLabel: string | null }) {
-  // 小数計算の誤差で±0.01のような無意味な差が出るのを防ぐ
-  const rounded = unitLabel ? Math.round(diff * 100) / 100 : Math.round(diff)
-  if (rounded === 0) return null
-  const isUp = rounded > 0
-  const displayValue = Math.abs(rounded).toLocaleString(undefined, {
-    maximumFractionDigits: unitLabel ? 2 : 0,
-  })
-  return (
-    <span
-      className={`inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-xs font-bold ${
-        isUp ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'
-      }`}
-    >
-      {isUp ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}¥
-      {displayValue}
-      {unitLabel ? `/${unitLabel}` : ''}
-    </span>
-  )
 }
 
 export function ProductHistoryModal({ product, onClose }: Props) {

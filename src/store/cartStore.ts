@@ -67,6 +67,19 @@ export type WishlistItem = {
   created_at: string
 }
 
+/**
+ * 商品ごとの「直近の購入価格・購入回数」のまとめ。
+ * 会計完了済みのトリップだけを対象にする(進行中のカートは含めない)。
+ * BudgetSetupScreenの「今回買う予定」リストで前回価格の表示や
+ * よく買う順の並び替えに使う。
+ */
+export type PurchaseSummary = {
+  lastPrice: number
+  lastAmount: number | null
+  lastUnit: string | null
+  count: number
+}
+
 type Screen = 'loading' | 'budget-setup' | 'shopping'
 
 type CartState = {
@@ -76,6 +89,7 @@ type CartState = {
   favorites: Product[]
   cartItems: Record<number, CartItem> // key: productId
   wishlist: WishlistItem[]
+  purchaseSummaryByProduct: Record<number, PurchaseSummary> // key: productId
   errorMessage: string | null
 
   init: () => Promise<void>
@@ -113,6 +127,45 @@ export function calcUnitPriceLabel(product: Product): string | null {
   return `¥${unitPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })} / ${product.unit}`
 }
 
+/**
+ * 商品ごとの「直近の購入価格・購入回数」をまとめて取得する。
+ * 会計完了済みのトリップだけを対象にし、日付の新しい順に並べて
+ * 取得することで、商品ごとに最初に出てきた行=最新の購入とわかる。
+ * init()と会計完了後の両方で使うため、関数として切り出している。
+ */
+async function loadPurchaseSummaryByProduct(): Promise<Record<number, PurchaseSummary>> {
+  const purchaseHistoryResult = await dbClient.exec(
+    `SELECT purchase.product_id AS product_id, purchase.price AS price,
+            purchase.amount AS amount, purchase.unit AS unit
+     FROM purchase
+     JOIN shopping_trip ON purchase.trip_id = shopping_trip.id
+     WHERE shopping_trip.status = 'completed'
+     ORDER BY purchase.created_at DESC`,
+  )
+  const purchaseHistoryRows = rowsToObjects<{
+    product_id: number
+    price: number
+    amount: number | null
+    unit: string | null
+  }>(purchaseHistoryResult)
+
+  const purchaseSummaryByProduct: Record<number, PurchaseSummary> = {}
+  for (const row of purchaseHistoryRows) {
+    const existing = purchaseSummaryByProduct[row.product_id]
+    if (existing) {
+      existing.count += 1
+    } else {
+      purchaseSummaryByProduct[row.product_id] = {
+        lastPrice: row.price,
+        lastAmount: row.amount,
+        lastUnit: row.unit,
+        count: 1,
+      }
+    }
+  }
+  return purchaseSummaryByProduct
+}
+
 export const useCartStore = create<CartState>((set, get) => ({
   screen: 'loading',
   tripId: null,
@@ -120,6 +173,7 @@ export const useCartStore = create<CartState>((set, get) => ({
   favorites: [],
   cartItems: {},
   wishlist: [],
+  purchaseSummaryByProduct: {},
   errorMessage: null,
 
   async init() {
@@ -136,13 +190,22 @@ export const useCartStore = create<CartState>((set, get) => ({
       )
       const wishlist = rowsToObjects<WishlistItem>(wishlistResult)
 
+      const purchaseSummaryByProduct = await loadPurchaseSummaryByProduct()
+
       const tripResult = await dbClient.exec(
         "SELECT id, budget FROM shopping_trip WHERE status = 'active' ORDER BY id DESC LIMIT 1",
       )
       const trips = rowsToObjects<{ id: number; budget: number }>(tripResult)
 
       if (trips.length === 0) {
-        set({ screen: 'budget-setup', favorites, wishlist, tripId: null, cartItems: {} })
+        set({
+          screen: 'budget-setup',
+          favorites,
+          wishlist,
+          purchaseSummaryByProduct,
+          tripId: null,
+          cartItems: {},
+        })
         return
       }
 
@@ -181,6 +244,7 @@ export const useCartStore = create<CartState>((set, get) => ({
         budget: trip.budget,
         favorites,
         wishlist,
+        purchaseSummaryByProduct,
         cartItems,
       })
     } catch (error) {
@@ -353,7 +417,17 @@ export const useCartStore = create<CartState>((set, get) => ({
     )
     await dbClient.persist()
 
-    set({ screen: 'budget-setup', tripId: null, budget: 0, cartItems: {} })
+    // 今会計を終えたばかりの購入も「前回価格・購入回数」に反映されるよう
+    // 再集計しておく(次に予算設定画面を開いた時にすぐ最新の状態で見える)
+    const purchaseSummaryByProduct = await loadPurchaseSummaryByProduct()
+
+    set({
+      screen: 'budget-setup',
+      tripId: null,
+      budget: 0,
+      cartItems: {},
+      purchaseSummaryByProduct,
+    })
   },
 
   /** 事前買い物予定リストに項目を追加する(自宅での自由入力を想定) */
