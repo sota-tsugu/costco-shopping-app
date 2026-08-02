@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Loader2, ClipboardList, Plus, X, Check, ChevronDown, Search } from 'lucide-react'
+import { Loader2, ClipboardList, Plus, X, Check, ChevronDown, Search, Settings } from 'lucide-react'
 import { useCartStore, type Product } from '../store/cartStore'
 import { toComparableValue, diffComparableValues } from '../utils/priceCompare'
 import { PriceDiffBadge } from '../components/PriceDiffBadge'
+import { SettingsModal } from './SettingsModal'
 
 // 買い物を始める前に、今回の見込み合計金額と「今回買う予定のもの」を
 // 確認する画面。企画書の方針により「予算は買い物1回ごと」に設定する
@@ -42,6 +43,7 @@ export function BudgetSetupScreen() {
   const [isStarting, setIsStarting] = useState(false)
   const [wishlistInput, setWishlistInput] = useState('')
   const [isAddingWishlistItem, setIsAddingWishlistItem] = useState(false)
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
   // 「今回買う予定」のチェック状態。初回に定番棚が読み込まれたタイミングで
   // 全部チェック済みにする(以降はユーザーの操作を優先し、上書きしない)。
@@ -183,6 +185,15 @@ export function BudgetSetupScreen() {
     <div className="min-h-screen bg-slate-50 pb-28">
       {/* 上部固定:見込み合計・予算(ShoppingScreenの買い物中画面と同じ構成に揃えている) */}
       <header className="sticky top-0 z-10 bg-blue-800 px-4 pb-4 pt-5 text-white shadow">
+        <div className="mb-1 flex items-center justify-end">
+          <button
+            onClick={() => setIsSettingsOpen(true)}
+            className="rounded-full p-1 text-blue-200 hover:bg-blue-700"
+            aria-label="設定"
+          >
+            <Settings className="h-5 w-5" />
+          </button>
+        </div>
         <div className="flex items-end justify-between">
           <span className="text-sm text-blue-100">見込み合計(チェック中の商品)</span>
           <span className="text-3xl font-bold">¥{estimatedTotal.toLocaleString()}</span>
@@ -400,6 +411,8 @@ export function BudgetSetupScreen() {
           買い物を始める
         </button>
       </div>
+
+      {isSettingsOpen && <SettingsModal onClose={() => setIsSettingsOpen(false)} />}
     </div>
   )
 }

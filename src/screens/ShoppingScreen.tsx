@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { Plus, Minus, PlusCircle, CheckCircle2, ClipboardList } from 'lucide-react'
+import { Plus, Minus, PlusCircle, CheckCircle2, ClipboardList, Settings } from 'lucide-react'
 import { useCartStore, calcTotal, calcUnitPriceLabel, type Product, type WishlistItem } from '../store/cartStore'
 import { AddProductForm } from './AddProductForm'
 import { ProductHistoryModal } from './ProductHistoryModal'
 import { WishlistMatchModal } from './WishlistMatchModal'
+import { SettingsModal } from './SettingsModal'
 
 // 買い物中のメイン画面。
 // UI/UXの4原則(企画書 6章)を意識したレイアウト:
@@ -31,6 +32,7 @@ export function ShoppingScreen() {
   const [matchingWishlistItem, setMatchingWishlistItem] = useState<WishlistItem | null>(null)
   const [prefillNameForNewProduct, setPrefillNameForNewProduct] = useState<string | null>(null)
   const [wishlistIdToResolve, setWishlistIdToResolve] = useState<number | null>(null)
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
   const total = calcTotal(cartItems)
   const progressRatio = budget > 0 ? Math.min(total / budget, 1) : 0
@@ -93,6 +95,15 @@ export function ShoppingScreen() {
     <div className="min-h-screen bg-slate-50 pb-28">
       {/* 上部固定:合計金額・予算進捗(視線移動の最小化) */}
       <header className="sticky top-0 z-10 bg-blue-800 px-4 pb-4 pt-5 text-white shadow">
+        <div className="mb-1 flex items-center justify-end">
+          <button
+            onClick={() => setIsSettingsOpen(true)}
+            className="rounded-full p-1 text-blue-200 hover:bg-blue-700"
+            aria-label="設定"
+          >
+            <Settings className="h-5 w-5" />
+          </button>
+        </div>
         <div className="flex items-end justify-between">
           <span className="text-sm text-blue-100">合計金額</span>
           <span className="text-3xl font-bold">¥{total.toLocaleString()}</span>
@@ -262,6 +273,8 @@ export function ShoppingScreen() {
           }}
         />
       )}
+
+      {isSettingsOpen && <SettingsModal onClose={() => setIsSettingsOpen(false)} />}
     </div>
   )
 }
