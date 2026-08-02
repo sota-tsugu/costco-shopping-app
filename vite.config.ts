@@ -13,7 +13,12 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // 'prompt': 新しいバージョンを見つけても勝手には切り替えず、
+      // アプリ側(src/components/UpdateBanner.tsx)でユーザーに確認してから
+      // 更新する。injectRegister: false と組み合わせ、Service Workerの
+      // 登録もUpdateBanner側のuseRegisterSWフックで行う(二重登録防止)。
+      registerType: 'prompt',
+      injectRegister: false,
       // sql.jsのWASMファイルなど、拡張子が特殊なファイルも
       // オフラインキャッシュの対象に含める
       workbox: {
