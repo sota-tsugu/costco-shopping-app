@@ -47,18 +47,18 @@ export function BudgetSetupScreen() {
 
   // 「今回買う予定」のチェック状態。初回に定番棚が読み込まれたタイミングで
   // 全部チェック済みにする(以降はユーザーの操作を優先し、上書きしない)。
-  const [checkedIds, setCheckedIds] = useState<Set<number> | null>(null)
+  const [checkedIds, setCheckedIds] = useState<Set<string> | null>(null)
   useEffect(() => {
     if (checkedIds === null && favorites.length > 0) {
       setCheckedIds(new Set(favorites.map((p) => p.id)))
     }
   }, [favorites, checkedIds])
 
-  function isChecked(productId: number) {
+  function isChecked(productId: string) {
     return checkedIds?.has(productId) ?? true
   }
 
-  function toggleChecked(productId: number) {
+  function toggleChecked(productId: string) {
     setCheckedIds((prev) => {
       const next = new Set(prev ?? favorites.map((p) => p.id))
       if (next.has(productId)) {

@@ -18,7 +18,9 @@
 
 ## 現在のフェーズ
 
-**STEP0(環境構築)・STEP1(フェーズ1-a)完了。フェーズ1-b完了(①内容量ベースの単価自動計算、②過去購入履歴・購入頻度の確認、③過去価格との比較、④事前買い物予定リストまで完了)。**
+**STEP0・STEP1(フェーズ1-a)・フェーズ1-b、完了。フェーズ2(パートナーとのリアルタイム共有)に着手中。**
+
+フェーズ2は企画書のv2時点では想定していなかった追加要望(SOTAさんがパートナーと共有して使いたいとのこと)。データの持ち方が「各端末のローカルのみ」から「Firebase(クラウド)経由でリアルタイム共有」に変わる、これまでで最大のアーキテクチャ変更。詳細は下の「フェーズ2」節を参照。
 
 STEP0で行ったこと:
 - Vite + React + TypeScriptのプロジェクト雛形作成
@@ -55,21 +57,59 @@ STEP1(フェーズ1-a)で行ったこと:
 まだ実装していないもの(フェーズ1-b残り・以降):
 - 事前買い物予定リスト機能内のProductAlias(表記ゆれ吸収・一度紐付けた組み合わせの記憶)
 - 定番棚商品のカテゴリを後から手動編集する機能(現状、商品名候補データベースから選んだ場合のみカテゴリが付き、自由入力で新規登録した商品は「その他」のまま)
-- 複数店舗対応(Store)、家族メンバー対応(FamilyMember)、シンプル/パワーユーザーモード切り替え
+- 複数店舗対応(Store)、シンプル/パワーユーザーモード切り替え
 
-## 技術構成(決定済み・変更しない)
+## フェーズ2:パートナーとのリアルタイム共有
+
+SOTAさんから「パートナーと共有して使いたい」との要望があり、着手。それまでの「データは各端末のブラウザ内にのみ保存(sql.js + IndexedDB、サーバー不使用)」という設計では複数端末間の共有ができないため、**sql.jsを廃止し、Firebase(Firestore + 匿名認証)へ全面移行した**。企画書v2では「初期段階でのリアルタイム家族間同期は着手しない」としていた非ゴールだが、実際の要望が出たため前倒しで着手している。
+
+### 認証・共有の仕組み(「家族コード」方式)
+
+- 各自のGoogleアカウントでログインする方式ではなく、**匿名認証(Firebase Authentication)+ 家族コード(合言葉のようなランダムな文字列。例: `K3F9-7QXP-2MRT`)** を家族内で共有する方式を採用(`src/firebase/household.ts`)。SOTAさんが以前使ったFirebaseアプリでも個人アカウントログインはしていなかった、という経緯を踏まえた選定
+- 家族コードは端末のlocalStorageに保存する。データはFirestoreの `households/{householdId}/...` 以下に保存され、その家族コードを知っている端末だけが読み書きできる
+- **セキュリティ上の割り切り**:Firestoreのセキュリティルール(`firestore.rules`)は「サインイン済み(匿名でも可)」だけを要求しており、「本当にその家族のメンバーか」までは厳密に確認していない。家族コードという文字列を知っているかどうかだけがアクセス制御になっている(合言葉方式)。買い物データ(金額・商品名程度)の重要度を踏まえた割り切り。Cloud Functions(サーバー側処理)を使えばもっと厳密にできるが、無料の Spark プランの制約上、また非エンジニアが保守する前提を踏まえ、あえてシンプルな方式にしている
+- 初回起動時、`HouseholdSetupScreen.tsx` で「新しく家族を作る」か「家族コードを入力して参加する」かを選ぶ。新規作成時は、その端末に残っていた以前のsql.jsデータ(定番棚・購入履歴)を一度だけFirestoreに引き継ぐ(`src/firebase/migrateLocalData.ts`)
+
+### データ設計の変更点(SQLからFirestoreへ)
+
+- テーブル(product/shopping_trip/purchase/wishlist)は、Firestoreのコレクション(`products`/`shoppingTrips`/`purchases`/`wishlist`、いずれも `households/{householdId}/` 配下のサブコレクション)にそのまま対応させた
+- FirestoreはSQLのようなJOINや集計(SUM/COUNT/GROUP BY)ができないため、以下の工夫をしている
+  - purchaseドキュメントに商品名(`productName`)を非正規化(重複)して保存し、JOINなしで表示できるようにした
+  - purchaseドキュメントに `tripStatus`('active'/'completed')を持たせ、会計完了時にそのトリップの全purchaseへバッチ更新することで、「完了済みの購入履歴だけ」を1回のクエリで取得できるようにした(SQLでのJOIN + WHERE相当)
+  - 商品ごとの購入回数・前回価格などの集計は、該当する購入記録をまとめて取得してからJavaScript側で計算している(件数が家庭利用の範囲では少ない=数千件程度のため、パフォーマンス上問題ない想定)
+- カート(進行中の買い物)のpurchaseドキュメントIDは `${tripId}_${productId}` という規則的なIDにしている。これにより「同じ商品を素早く連打しても数量が正しく積み上がるか」という問題を、Firestoreの `increment()` (読み込まずに増減できる仕組み)だけで解決でき、以前のsql.js版にあった「商品ごとの順序保証キュー(`enqueueSync`)」のような自前の仕組みが不要になった
+- 商品名の入力候補データベース(`src/data/productCatalog.ts`、約3200件)は、Firestoreには保存していない(各家族がクラウド上に同じ参考データを重複して持つ意味がないため)。今まで通り静的なファイルとして持ち、`cartStore.ts`の`searchProductCatalog`でその場でJavaScript検索している
+
+### オフライン対応
+
+- Firestoreの`persistentLocalCache`(`src/firebase/config.ts`)により、オフラインでもデータの読み書きができ、オンラインに戻ると自動で同期される。これはFirebase SDKの標準機能で、以前のsql.js版で自前で作っていた「IndexedDBへの保存・復元」処理が不要になった
+
+### 移行中の一時的な資産(削除予定)
+
+- `src/db/worker.ts` / `src/db/dbClient.ts` / `src/db/persistence.ts`:以前のsql.js実装。`src/firebase/migrateLocalData.ts`(既存データの一度きりの引き継ぎ)からのみ参照されている。**移行が問題なく完了したことを確認したら、これらのファイルと`migrateLocalData.ts`ごと削除してよい**
+- `costco_products_raw.txt`(リポジトリ直下):商品名候補データベース生成時の元データ。生成済みのため参照専用、削除しても支障なし
+
+### Firebaseプロジェクト情報
+
+- プロジェクトID:`costco-shopping-app-39395`
+- 無料の Spark プラン(従量課金のBlazeプランへは意図的にアップグレードしていない)
+- `src/firebase/config.ts`内の`firebaseConfig`(apiKeyなど)はコード内に直接書いているが、これはFirebase Webアプリでは意図された公開情報であり、通常の「秘匿情報をコードに書かない」ルールの対象外(実際のアクセス制御は`firestore.rules`で行う)
+- `firestore.rules`はこのリポジトリで管理しているが、Firebase CLIでのデプロイは行っていない(Claude Coworkの作業環境がネット接続不可のため)。**内容を変更した場合は、SOTAさんにFirebaseコンソール→Firestore Database→「ルール」タブに手動で貼り付けてもらう必要がある**
+
+## 技術構成(2026年時点。フェーズ2でデータ保存方式を変更)
 
 - フロントエンド:React (Vite) + TypeScript
-- データ保存:sql.js(ブラウザ内SQLite/WASM)を**Web Worker内**で動かす。メインスレッドで直接sql.jsを呼び出さない
-- 永続化:sql.jsはメモリ上で動くため、変更のたびにIndexedDBへシリアライズして保存する(`src/db/persistence.ts`)
+- データ保存:**Firebase Firestore**(クラウド上のデータベース)。`households/{householdId}/...`以下に家族ごとのデータを保存し、パートアートとリアルタイム共有する。オフライン対応はFirestoreの`persistentLocalCache`機能(標準搭載)を利用
+- 認証:Firebase Authentication の匿名認証 + 家族コード(合言葉)方式。個人のGoogleアカウントは使わない
+- ~~sql.js(ブラウザ内SQLite/WASM)~~:フェーズ2でFirestoreに置き換え、廃止(旧実装は`src/db/`以下に一時的に残っているが移行専用。上の「フェーズ2」節を参照)
 - スタイリング:Tailwind CSS
 - アイコン:Lucide
-- 状態管理:Zustand(STEP0時点では未使用。STEP1でカート状態管理に導入予定)
+- 状態管理:Zustand
 - PWA対応:`vite-plugin-pwa`によるService Workerでオフラインキャッシュ
 - ホスティング:GitHub Pages(リポジトリ名 `costco-shopping-app` を前提にvite.config.tsの`base`を設定済み。リポジトリ名を変える場合はここも変更が必要)
 - バージョン管理:GitHub
 
-選定理由の詳細は `costco_app_concept_v2.md` の「4. 技術構成(決定)」を参照。
+企画書v2時点の選定理由(sql.js採用の経緯など)は `costco_app_concept_v2.md` の「4. 技術構成(決定)」を参照。ただしデータ保存方式はフェーズ2で上記の通り変更されているため、実装に着手する際は本ファイルの内容を優先すること。
 
 ## STEP0で行った技術的な判断(理由付き)
 
@@ -103,6 +143,6 @@ STEP0の作業中に判明した、今後のセッションでも影響する制
 
 ## セキュリティ・秘匿情報の扱い
 
-- APIキー・パスワードなどはコードに直接書き込まない
+- APIキー・パスワードなどはコードに直接書き込まない(**例外:Firebaseの`firebaseConfig`は公開情報のため直書きしている。詳細は「フェーズ2」節を参照**)
 - 将来必要になった場合は`.env`ファイル(`.gitignore`で除外済み)で管理する
 - GitHubの個人アクセストークンなど、認証情報はコード・リポジトリ内に一切保存しない

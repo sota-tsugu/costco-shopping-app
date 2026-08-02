@@ -1,0 +1,33 @@
+// Firestoreのセキュリティルール(誰がデータを読み書きできるかのルール)。
+//
+// 【設計】家族コード(households/{householdId})という長いランダムな
+// 文字列を知っている端末だけがデータを読み書きできる、という設計。
+// 個人のGoogleアカウントでのログインは行わず、匿名認証(誰でもアプリを
+// 開けば自動的にサインインされる)+ 家族コードを知っているかどうか、
+// という合言葉に近い方式にしている(SOTAさんとの相談の上で決定)。
+//
+// 【注意点】このルールは「匿名でもいいのでサインインしていること」
+// だけを要求しており、「本当にその家族のメンバーか」までは厳密には
+// 確認していない。家族コードは十分に長いランダムな文字列(例:
+// K3F9-7QXP-2MRT)なので、他人が偶然言い当てることは事実上ないが、
+// 誰かに家族コードを教えてしまうとその人もデータを見られる点は
+// 理解した上で使うこと。
+//
+// 【使い方】このファイルの中身をFirebaseコンソール →
+// Firestore Database → 「ルール」タブに貼り付けて「公開」する。
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /households/{householdId} {
+      // 家族コードそのものの存在確認(参加時の確認など)用
+      allow read, write: if request.auth != null;
+
+      // その家族配下のすべてのデータ(products, purchases, shoppingTrips, wishlistなど)
+      match /{document=**} {
+        allow read, write: if request.auth != null;
+      }
+    }
+  }
+}

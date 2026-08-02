@@ -1,23 +1,33 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Loader2, AlertTriangle } from 'lucide-react'
 import { useCartStore } from './store/cartStore'
 import { BudgetSetupScreen } from './screens/BudgetSetupScreen'
 import { ShoppingScreen } from './screens/ShoppingScreen'
+import { HouseholdSetupScreen } from './screens/HouseholdSetupScreen'
 import { UpdateBanner } from './components/UpdateBanner'
+import { getSavedHouseholdId } from './firebase/household'
 
 // アプリのエントリーポイント。
-// 画面の切り替えは cartStore の `screen` 状態に応じて行うシンプルな
-// 構成にしている(react-routerなどのライブラリは、画面数が増えるまでは
-// 不要と判断し導入していない)。
+// 最初に「家族コード」が端末に保存されているかを確認し、なければ
+// HouseholdSetupScreen(家族を作る/参加する画面)を表示する。
+// 家族コードが決まったら、cartStoreのFirestore購読を開始する。
 
 function App() {
+  const [householdReady, setHouseholdReady] = useState(() => getSavedHouseholdId() !== null)
+
   const screen = useCartStore((state) => state.screen)
   const errorMessage = useCartStore((state) => state.errorMessage)
   const init = useCartStore((state) => state.init)
 
   useEffect(() => {
-    init()
-  }, [init])
+    if (householdReady) {
+      init()
+    }
+  }, [householdReady, init])
+
+  if (!householdReady) {
+    return <HouseholdSetupScreen onReady={() => setHouseholdReady(true)} />
+  }
 
   return (
     <>

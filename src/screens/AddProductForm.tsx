@@ -1,16 +1,17 @@
 import { useEffect, useState } from 'react'
 import { X, Loader2, Search } from 'lucide-react'
-import { searchProductCatalog, type Product } from '../store/cartStore'
+import { useCartStore, searchProductCatalog, type CatalogSuggestion } from '../store/cartStore'
 
 // 「マイ定番棚」に新しい商品を登録するための簡易フォーム。
-// フェーズ1-bで、内容量(g/mlなど)と単位を入力できるようにし、
-// 入力すると単価(100gあたりいくら、など)を自動計算して表示する。
+// 内容量(g/mlなど)と単位を入力できるようにし、入力すると単価
+// (100gあたりいくら、など)を自動計算して表示する。
 // 内容量・単位は任意入力(分からなければ空でもよい)。
 //
 // 商品名の入力中は、商品名候補データベース(costcotuu.comの商品一覧を
-// 元に登録した参考データ。まだ我が家で買ったことはない)から一致する
-// ものを候補として表示する。候補をタップすると、既にDBにある商品を
-// 定番棚に「昇格」させる形になり、同じ名前の商品が重複登録されるのを防ぐ。
+// 元にした参考データ。まだ我が家で買ったことはない)と、現在の
+// マイ定番棚の両方から一致するものを候補として表示する。
+// 定番棚に既にある商品を選んだ場合はその商品を更新し、商品名候補
+// データベースのみの商品を選んだ場合は新規登録の下書きとして使う。
 
 const UNIT_OPTIONS = [
   { value: '', label: '単位なし' },
@@ -29,21 +30,25 @@ type Props = {
     price: number,
     amount: number | null,
     unit: string | null,
-    matchedProductId?: number | null,
+    matchedProductId?: string | null,
+    matchedCategory?: string | null,
   ) => Promise<void>
   /** 事前リストから登録する場合など、商品名をあらかじめ入力しておきたい時に使う */
   initialName?: string
 }
 
 export function AddProductForm({ onClose, onSubmit, initialName }: Props) {
+  const favorites = useCartStore((state) => state.favorites)
+
   const [name, setName] = useState(initialName ?? '')
   const [price, setPrice] = useState('')
   const [amount, setAmount] = useState('')
   const [unit, setUnit] = useState('')
   const [isSaving, setIsSaving] = useState(false)
 
-  const [suggestions, setSuggestions] = useState<Product[]>([])
-  const [matchedProductId, setMatchedProductId] = useState<number | null>(null)
+  const [suggestions, setSuggestions] = useState<CatalogSuggestion[]>([])
+  const [matchedProductId, setMatchedProductId] = useState<string | null>(null)
+  const [matchedCategory, setMatchedCategory] = useState<string | null>(null)
   const [isSuggestionsOpen, setIsSuggestionsOpen] = useState(false)
 
   // 商品名の入力に合わせて候補を検索する(300ms待ってから検索し、
@@ -53,12 +58,11 @@ export function AddProductForm({ onClose, onSubmit, initialName }: Props) {
       setSuggestions([])
       return
     }
-    const timer = setTimeout(async () => {
-      const results = await searchProductCatalog(name)
-      setSuggestions(results)
+    const timer = setTimeout(() => {
+      setSuggestions(searchProductCatalog(name, favorites))
     }, 300)
     return () => clearTimeout(timer)
-  }, [name])
+  }, [name, favorites])
 
   const canSubmit = name.trim().length > 0 && Number(price) > 0
 
@@ -71,15 +75,15 @@ export function AddProductForm({ onClose, onSubmit, initialName }: Props) {
   function handleNameChange(value: string) {
     setName(value)
     setMatchedProductId(null) // 手入力で編集したら候補選択は無効にする
+    setMatchedCategory(null)
     setIsSuggestionsOpen(true)
   }
 
-  function handlePickSuggestion(product: Product) {
+  function handlePickSuggestion(product: CatalogSuggestion) {
     setName(product.name)
     setMatchedProductId(product.id)
+    setMatchedCategory(product.category)
     setIsSuggestionsOpen(false)
-    // 候補データベースの商品は価格が未登録なので、価格欄はそのまま
-    // (すでに定番棚にある商品を選んだ場合は現在価格を引き継ぐ)
     if (product.default_price !== null) {
       setPrice(String(product.default_price))
     }
@@ -101,6 +105,7 @@ export function AddProductForm({ onClose, onSubmit, initialName }: Props) {
         amountValue > 0 ? amountValue : null,
         unit !== '' ? unit : null,
         matchedProductId,
+        matchedCategory,
       )
       onClose()
     } finally {
@@ -129,12 +134,12 @@ export function AddProductForm({ onClose, onSubmit, initialName }: Props) {
             className="w-full rounded-lg border border-slate-300 px-3 py-3 text-base focus:border-blue-600 focus:outline-none"
           />
           {matchedProductId !== null && (
-            <span className="mt-1 block text-xs text-blue-700">候補から選択済み</span>
+            <span className="mt-1 block text-xs text-blue-700">定番棚の登録済み商品を選択中</span>
           )}
           {isSuggestionsOpen && suggestions.length > 0 && (
             <ul className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
-              {suggestions.map((product) => (
-                <li key={product.id}>
+              {suggestions.map((product, index) => (
+                <li key={product.id ?? `catalog-${index}`}>
                   <button
                     type="button"
                     onClick={() => handlePickSuggestion(product)}

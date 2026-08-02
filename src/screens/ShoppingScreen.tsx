@@ -31,7 +31,7 @@ export function ShoppingScreen() {
   const [historyProduct, setHistoryProduct] = useState<Product | null>(null)
   const [matchingWishlistItem, setMatchingWishlistItem] = useState<WishlistItem | null>(null)
   const [prefillNameForNewProduct, setPrefillNameForNewProduct] = useState<string | null>(null)
-  const [wishlistIdToResolve, setWishlistIdToResolve] = useState<number | null>(null)
+  const [wishlistIdToResolve, setWishlistIdToResolve] = useState<string | null>(null)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
   const total = calcTotal(cartItems)
@@ -77,16 +77,14 @@ export function ShoppingScreen() {
     price: number,
     amount: number | null,
     unit: string | null,
-    matchedProductId?: number | null,
+    matchedProductId?: string | null,
+    matchedCategory?: string | null,
   ) {
-    await addFavoriteProduct(name, price, amount, unit, matchedProductId)
+    const savedProduct = await addFavoriteProduct(name, price, amount, unit, matchedProductId, matchedCategory)
     // 事前リストの「新しい商品として登録する」経由の場合は、
-    // 今できたばかりの商品(favoritesの先頭に追加される)をそのままカートへ
+    // 今登録したばかりの商品をそのままカートへ追加する
     if (wishlistIdToResolve !== null) {
-      const newest = useCartStore.getState().favorites[0]
-      if (newest) {
-        resolveWishlistItem(wishlistIdToResolve, newest)
-      }
+      resolveWishlistItem(wishlistIdToResolve, savedProduct)
       setWishlistIdToResolve(null)
     }
   }

@@ -19,10 +19,11 @@ export default defineConfig({
       // 登録もUpdateBanner側のuseRegisterSWフックで行う(二重登録防止)。
       registerType: 'prompt',
       injectRegister: false,
-      // sql.jsのWASMファイルなど、拡張子が特殊なファイルも
-      // オフラインキャッシュの対象に含める
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,wasm}'],
+        globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        // FirebaseのSDK+商品名候補データベースを含むため、通常の上限(2MB)
+        // だとオフラインキャッシュの対象から漏れることがあるため広げておく
+        maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
       },
       manifest: {
         name: '我が家専用コストコ買い物リスト',

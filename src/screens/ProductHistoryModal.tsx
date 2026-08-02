@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { X, Loader2, History, Pencil, Check } from 'lucide-react'
-import { dbClient, rowsToObjects } from '../db/dbClient'
+import { collection, query, where, getDocs } from 'firebase/firestore'
+import { db } from '../firebase/config'
+import { getSavedHouseholdId } from '../firebase/household'
 import { useCartStore, type Product } from '../store/cartStore'
 import { toComparableValue, diffComparableValues, formatComparable } from '../utils/priceCompare'
 import { PriceDiffBadge } from '../components/PriceDiffBadge'
@@ -39,17 +41,28 @@ export function ProductHistoryModal({ product, onClose }: Props) {
 
     async function load() {
       try {
-        const result = await dbClient.exec(
-          `SELECT purchase.created_at AS created_at, purchase.price AS price,
-                  purchase.quantity AS quantity, purchase.amount AS amount, purchase.unit AS unit
-           FROM purchase
-           JOIN shopping_trip ON purchase.trip_id = shopping_trip.id
-           WHERE purchase.product_id = ? AND shopping_trip.status = 'completed'
-           ORDER BY purchase.created_at DESC`,
-          [product.id],
+        const householdId = getSavedHouseholdId()
+        if (!householdId) throw new Error('家族コードが見つかりません')
+
+        const snapshot = await getDocs(
+          query(
+            collection(db, 'households', householdId, 'purchases'),
+            where('productId', '==', product.id),
+            where('tripStatus', '==', 'completed'),
+          ),
         )
+        const fetched = snapshot.docs
+          .map((d) => ({
+            created_at: d.data().createdAt as string,
+            price: d.data().price as number,
+            quantity: d.data().quantity as number,
+            amount: (d.data().amount ?? null) as number | null,
+            unit: (d.data().unit ?? null) as string | null,
+          }))
+          .sort((a, b) => (a.created_at > b.created_at ? -1 : 1))
+
         if (!cancelled) {
-          setRows(rowsToObjects<PurchaseHistoryRow>(result))
+          setRows(fetched)
         }
       } catch (error) {
         if (!cancelled) {
