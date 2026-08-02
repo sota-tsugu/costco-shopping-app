@@ -89,6 +89,12 @@ type CartState = {
   screen: Screen
   tripId: string | null
   budget: number
+  /**
+   * 「今回買う予定」でチェックした商品idの一覧。買い物開始時にトリップへ
+   * 記録し、買い物中の画面で「予定だがまだカートに入れていない」商品を
+   * 目立たせるために使う(カートの中身そのものではない点に注意)。
+   */
+  plannedProductIds: string[]
   favorites: Product[]
   cartItems: Record<string, CartItem> // key: productId
   wishlist: WishlistItem[]
@@ -96,8 +102,29 @@ type CartState = {
   errorMessage: string | null
 
   init: () => Promise<void>
-  startTrip: (budget: number) => Promise<void>
-  addToCart: (product: Product) => void
+  /**
+   * 買い物を開始する。plannedProductIdsは「今回買う予定」でチェックして
+   * いた商品のid一覧(買い物中の画面での目印表示にのみ使う)。
+   * 以前はここで定番棚の商品を自動でカートに一括投入していたが、
+   * 「価格・内容量は店内でカートに入れる瞬間に確認・入力したい」という
+   * 方針に変更したため、開始時点ではカートは空にする。
+   */
+  startTrip: (budget: number, plannedProductIds: string[]) => Promise<void>
+  /**
+   * 今回の価格・内容量・単位・数量を指定してカートに追加する(新規追加)。
+   * 前回購入時の値をそのまま使う「ワンタップ追加」も、値を編集してから
+   * 追加する場合も、どちらもこの関数を通る。
+   */
+  addToCartWithDetails: (
+    product: Product,
+    details: { price: number; amount: number | null; unit: string | null; quantity: number },
+  ) => void
+  /**
+   * 既にカートに入っている商品の数量だけを+1する(価格・内容量には
+   * 触れない)。同じ商品をもう1個追加する時に、価格入力をもう一度
+   * 挟まずに済ませるためのワンタップ操作。
+   */
+  incrementCartQuantity: (productId: string) => void
   decrementFromCart: (productId: string) => void
   addFavoriteProduct: (
     name: string,
@@ -134,8 +161,6 @@ type CartState = {
   completeCheckout: () => Promise<void>
   addWishlistItem: (rawName: string) => Promise<void>
   removeWishlistItem: (wishlistId: string) => Promise<void>
-  /** 事前リストの項目を商品に紐付け、カートに追加してリストから外す */
-  resolveWishlistItem: (wishlistId: string, product: Product) => void
   /** 会計完了後などに、前回価格・購入回数の集計をFirestoreから取り直す */
   refreshPurchaseSummary: () => Promise<void>
 }
@@ -155,6 +180,23 @@ export function calcUnitPriceLabel(product: Product): string | null {
   }
   const unitPrice = product.default_price / product.amount
   return `¥${unitPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })} / ${product.unit}`
+}
+
+/**
+ * カートに追加する時の「今回の価格・内容量・単位」の初期値(提案値)を
+ * 決める。直近の購入履歴があればそれを優先し(=直近で購入した価格を
+ * 採用する、という方針)、購入履歴がない(まだ一度も買ったことがない)
+ * 商品の場合は登録時の価格・内容量・単位を使う。
+ */
+export function getSuggestedCartDetails(
+  product: Product,
+  summary: PurchaseSummary | undefined,
+): { price: number; amount: number | null; unit: string | null } {
+  return {
+    price: summary?.lastPrice ?? product.default_price ?? 0,
+    amount: summary?.lastAmount ?? product.amount,
+    unit: summary?.lastUnit ?? product.unit,
+  }
 }
 
 /**
@@ -250,6 +292,7 @@ export const useCartStore = create<CartState>((set, get) => ({
   screen: 'loading',
   tripId: null,
   budget: 0,
+  plannedProductIds: [],
   favorites: [],
   cartItems: {},
   wishlist: [],
@@ -312,7 +355,7 @@ export const useCartStore = create<CartState>((set, get) => ({
         query(householdCollection(householdId, 'shoppingTrips'), where('status', '==', 'active')),
         (snapshot) => {
           if (snapshot.empty) {
-            set({ screen: 'budget-setup', tripId: null, budget: 0, cartItems: {} })
+            set({ screen: 'budget-setup', tripId: null, budget: 0, plannedProductIds: [], cartItems: {} })
             return
           }
           // 万一複数あった場合は一番新しいものを採用する
@@ -321,10 +364,16 @@ export const useCartStore = create<CartState>((set, get) => ({
               id: d.id,
               budget: d.data().budget as number,
               startedAt: d.data().startedAt as string,
+              plannedProductIds: (d.data().plannedProductIds ?? []) as string[],
             }))
             .sort((a, b) => (a.startedAt > b.startedAt ? -1 : 1))
           const trip = trips[0]
-          set({ screen: 'shopping', tripId: trip.id, budget: trip.budget })
+          set({
+            screen: 'shopping',
+            tripId: trip.id,
+            budget: trip.budget,
+            plannedProductIds: trip.plannedProductIds,
+          })
 
           // このトリップのカート中身(purchases)もリアルタイム購読する
           onSnapshot(
@@ -357,7 +406,7 @@ export const useCartStore = create<CartState>((set, get) => ({
     }
   },
 
-  async startTrip(budget: number) {
+  async startTrip(budget, plannedProductIds) {
     const householdId = requireHouseholdId()
     const now = new Date().toISOString()
     await addDoc(householdCollection(householdId, 'shoppingTrips'), {
@@ -366,37 +415,45 @@ export const useCartStore = create<CartState>((set, get) => ({
       startedAt: now,
       completedAt: null,
       actualTotal: null,
+      plannedProductIds,
     })
     // 実際の画面切り替えはshoppingTripsのonSnapshotで自動的に行われる
   },
 
-  addToCart(product) {
+  addToCartWithDetails(product, details) {
     const { tripId } = get()
-    if (tripId === null) return
+    if (tripId === null || details.quantity <= 0) return
 
     const householdId = requireHouseholdId()
     const purchaseId = `${tripId}_${product.id}`
-    const price = product.default_price ?? 0
     const now = new Date().toISOString()
 
-    // Firestoreの increment() を使うことで、同時に何度タップしても
-    // 数量の増加が正しく積み上がる(読み込んでから書き込む、という
-    // 手順を踏まないので、パートナーと同時に操作しても競合しない)。
-    void setDoc(
-      doc(householdCollection(householdId, 'purchases'), purchaseId),
-      {
-        productId: product.id,
-        productName: product.name,
-        tripId,
-        price,
-        amount: product.amount,
-        unit: product.unit,
-        quantity: increment(1),
-        createdAt: now,
-        tripStatus: 'active',
-      },
-      { merge: true },
-    )
+    // 数量も含めてこの1回のsetDocで確定させる(incrementではなく実数を
+    // 書き込む)。価格・内容量・単位を「今回の実際の値」として明示的に
+    // 保存することが目的のため、ここでは前の値とマージせず丸ごと上書きする。
+    void setDoc(doc(householdCollection(householdId, 'purchases'), purchaseId), {
+      productId: product.id,
+      productName: product.name,
+      tripId,
+      price: details.price,
+      amount: details.amount,
+      unit: details.unit,
+      quantity: details.quantity,
+      createdAt: now,
+      tripStatus: 'active',
+    })
+  },
+
+  incrementCartQuantity(productId) {
+    const { cartItems } = get()
+    const existing = cartItems[productId]
+    if (!existing) return
+
+    const householdId = requireHouseholdId()
+    const purchaseRef = doc(householdCollection(householdId, 'purchases'), existing.purchaseId)
+    // 価格・内容量には触れず、数量だけを+1する(同じ商品を追加で
+    // 1個カートに入れる操作。今回の価格を毎回聞き直さないための工夫)
+    void updateDoc(purchaseRef, { quantity: increment(1) })
   },
 
   decrementFromCart(productId) {
@@ -545,11 +602,6 @@ export const useCartStore = create<CartState>((set, get) => ({
   async removeWishlistItem(wishlistId) {
     const householdId = requireHouseholdId()
     await deleteDoc(doc(householdCollection(householdId, 'wishlist'), wishlistId))
-  },
-
-  resolveWishlistItem(wishlistId, product) {
-    get().addToCart(product)
-    void get().removeWishlistItem(wishlistId)
   },
 
   async refreshPurchaseSummary() {

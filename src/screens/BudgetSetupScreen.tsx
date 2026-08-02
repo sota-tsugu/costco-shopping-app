@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Loader2, ClipboardList, Plus, X, Check, ChevronDown, Search, Settings, ListPlus } from 'lucide-react'
-import { useCartStore, searchProductCatalog, type Product, type CatalogSuggestion } from '../store/cartStore'
-import { toComparableValue, diffComparableValues } from '../utils/priceCompare'
-import { PriceDiffBadge } from '../components/PriceDiffBadge'
+import {
+  useCartStore,
+  searchProductCatalog,
+  getSuggestedCartDetails,
+  type Product,
+  type CatalogSuggestion,
+} from '../store/cartStore'
 import { SettingsModal } from './SettingsModal'
 import { ManageFavoritesModal } from './ManageFavoritesModal'
 import { TricolorAccent } from '../components/TricolorAccent'
@@ -34,7 +38,6 @@ import { TricolorAccent } from '../components/TricolorAccent'
 
 export function BudgetSetupScreen() {
   const startTrip = useCartStore((state) => state.startTrip)
-  const addToCart = useCartStore((state) => state.addToCart)
   const favorites = useCartStore((state) => state.favorites)
   const wishlist = useCartStore((state) => state.wishlist)
   const addWishlistItem = useCartStore((state) => state.addWishlistItem)
@@ -90,13 +93,14 @@ export function BudgetSetupScreen() {
   }
 
   // 画面上部に表示する「見込み合計金額」。チェックが入っている商品の
-  // 現在価格を合計するだけなので、メモリ上の計算だけで即座に求まる。
+  // 価格(直近の購入価格があればそれを優先)を合計するだけなので、
+  // メモリ上の計算だけで即座に求まる。
   const estimatedTotal = useMemo(() => {
     return favorites.reduce((sum, p) => {
       if (!isChecked(p.id)) return sum
-      return sum + (p.default_price ?? 0)
+      return sum + getSuggestedCartDetails(p, purchaseSummaryByProduct[p.id]).price
     }, 0)
-  }, [favorites, checkedIds])
+  }, [favorites, checkedIds, purchaseSummaryByProduct])
 
   const budgetNumber = Number(budgetInput) || 0
   const progressRatio = budgetNumber > 0 ? Math.min(estimatedTotal / budgetNumber, 1) : 0
@@ -189,35 +193,18 @@ export function BudgetSetupScreen() {
     setCheckedIds(new Set())
   }
 
-  /** 「前回 ¥◯◯」の表示用に、現在価格と前回購入価格の差分を求める */
-  function getLastPriceDiff(product: Product) {
-    const summary = purchaseSummaryByProduct[product.id]
-    if (!summary) return null
-    const current = toComparableValue({
-      price: product.default_price ?? 0,
-      amount: product.amount,
-      unit: product.unit,
-    })
-    const last = toComparableValue({
-      price: summary.lastPrice,
-      amount: summary.lastAmount,
-      unit: summary.lastUnit,
-    })
-    return { last, diff: diffComparableValues(current, last) }
-  }
-
   async function handleStart() {
     const budget = Number(budgetInput)
     if (!Number.isFinite(budget) || budget <= 0) return
 
     setIsStarting(true)
     try {
-      await startTrip(budget)
-      // チェックの入っている定番棚の商品を、そのままカートに入れる
-      const plannedProducts = favorites.filter((p) => isChecked(p.id))
-      for (const product of plannedProducts) {
-        addToCart(product)
-      }
+      // チェックの入っている商品idを「予定」としてトリップに記録するだけで、
+      // カートには入れない(価格・内容量は店内でカートに入れる瞬間に
+      // 確認・入力する方針に変更したため)。ShoppingScreen側では、この
+      // 予定に入っているがまだカートに入れていない商品を目立たせて表示する
+      const plannedProductIds = favorites.filter((p) => isChecked(p.id)).map((p) => p.id)
+      await startTrip(budget, plannedProductIds)
     } finally {
       setIsStarting(false)
     }
@@ -364,13 +351,14 @@ export function BudgetSetupScreen() {
                         <ul className="space-y-1">
                           {items.map((product) => {
                             const checked = isChecked(product.id)
-                            const priceDiff = getLastPriceDiff(product)
+                            const summary = purchaseSummaryByProduct[product.id]
+                            const suggested = getSuggestedCartDetails(product, summary)
 
                             return (
                               <li key={product.id}>
                                 <button
                                   onClick={() => toggleChecked(product.id)}
-                                  className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-slate-50"
+                                  className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left hover:bg-slate-50"
                                 >
                                   <span
                                     className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 ${
@@ -386,23 +374,20 @@ export function BudgetSetupScreen() {
                                   >
                                     {product.name}
                                   </span>
-                                  <span className="shrink-0 text-right text-xs text-slate-400">
-                                    ¥{(product.default_price ?? 0).toLocaleString()}
-                                    {priceDiff && (
-                                      <span className="ml-1 text-slate-400">
-                                        前回¥
-                                        {priceDiff.last.value.toLocaleString(undefined, {
-                                          maximumFractionDigits: 0,
-                                        })}
+                                  <span className="shrink-0 text-right">
+                                    <span
+                                      className={`block text-base font-bold ${
+                                        checked ? 'text-costco-red-700' : 'text-slate-400'
+                                      }`}
+                                    >
+                                      ¥{suggested.price.toLocaleString()}
+                                    </span>
+                                    {summary && (
+                                      <span className="block text-[10px] leading-tight text-slate-400">
+                                        前回購入価格
                                       </span>
                                     )}
                                   </span>
-                                  {priceDiff?.diff && (
-                                    <PriceDiffBadge
-                                      diff={priceDiff.diff.diff}
-                                      unitLabel={priceDiff.diff.unitLabel}
-                                    />
-                                  )}
                                 </button>
                               </li>
                             )

@@ -1,17 +1,28 @@
 import { useState } from 'react'
-import { Plus, Minus, PlusCircle, CheckCircle2, ClipboardList, Settings } from 'lucide-react'
-import { useCartStore, calcTotal, calcUnitPriceLabel, type Product, type WishlistItem } from '../store/cartStore'
+import { Plus, Minus, PlusCircle, CheckCircle2, ClipboardList, Settings, Pencil } from 'lucide-react'
+import {
+  useCartStore,
+  calcTotal,
+  calcUnitPriceLabel,
+  getSuggestedCartDetails,
+  type Product,
+  type WishlistItem,
+} from '../store/cartStore'
 import { AddProductForm } from './AddProductForm'
 import { ProductHistoryModal } from './ProductHistoryModal'
 import { WishlistMatchModal } from './WishlistMatchModal'
 import { SettingsModal } from './SettingsModal'
+import { QuickAddModal } from './QuickAddModal'
 import { TricolorAccent } from '../components/TricolorAccent'
 
 // 買い物中のメイン画面。
 // UI/UXの4原則(企画書 6章)を意識したレイアウト:
 //   1. 片手操作:主要ボタンは画面下部に集約、タイルは大きめのタップ領域
 //   2. 視線移動の最小化:合計金額・予算進捗は画面上部に常時固定表示
-//   3. 入力ゼロに近い操作:定番棚をタップするだけでカートに追加
+//   3. 入力ゼロに近い操作:「追加」ワンタップで前回と同じ内容のままカートへ
+//      (今回の価格・内容量が違う時だけ、鉛筆アイコンからQuickAddModalを
+//      開いて入力し直す。毎回フォームを挟むと片手操作の速さが失われる
+//      ため、「基本は一発タップ、必要な時だけ編集」という使い分けにした)
 //   4. 誤操作からの回復:会計完了は確認ダイアログを挟む(フェーズ1-aでは
 //      シンプルなconfirm()を使用。将来的にはUndo通知に置き換えてもよい)
 
@@ -20,11 +31,13 @@ export function ShoppingScreen() {
   const favorites = useCartStore((state) => state.favorites)
   const cartItems = useCartStore((state) => state.cartItems)
   const wishlist = useCartStore((state) => state.wishlist)
-  const addToCart = useCartStore((state) => state.addToCart)
+  const plannedProductIds = useCartStore((state) => state.plannedProductIds)
+  const purchaseSummaryByProduct = useCartStore((state) => state.purchaseSummaryByProduct)
+  const addToCartWithDetails = useCartStore((state) => state.addToCartWithDetails)
+  const incrementCartQuantity = useCartStore((state) => state.incrementCartQuantity)
   const decrementFromCart = useCartStore((state) => state.decrementFromCart)
   const addFavoriteProduct = useCartStore((state) => state.addFavoriteProduct)
   const completeCheckout = useCartStore((state) => state.completeCheckout)
-  const resolveWishlistItem = useCartStore((state) => state.resolveWishlistItem)
   const removeWishlistItem = useCartStore((state) => state.removeWishlistItem)
 
   const [isAddFormOpen, setIsAddFormOpen] = useState(false)
@@ -34,11 +47,18 @@ export function ShoppingScreen() {
   const [prefillNameForNewProduct, setPrefillNameForNewProduct] = useState<string | null>(null)
   const [wishlistIdToResolve, setWishlistIdToResolve] = useState<string | null>(null)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [quickAddProduct, setQuickAddProduct] = useState<Product | null>(null)
 
   const total = calcTotal(cartItems)
   const progressRatio = budget > 0 ? Math.min(total / budget, 1) : 0
   const isOverBudget = total > budget
   const cartItemCount = Object.values(cartItems).reduce((sum, item) => sum + item.quantity, 0)
+
+  /** 前回(なければ登録時)の価格・内容量・単位のまま、ワンタップでカートに追加する */
+  function handleFastAdd(product: Product) {
+    const suggested = getSuggestedCartDetails(product, purchaseSummaryByProduct[product.id])
+    addToCartWithDetails(product, { ...suggested, quantity: 1 })
+  }
 
   function handleWishlistTap(item: WishlistItem) {
     // 「トイペ」のような自由入力の名前と、定番棚の商品名が完全一致すれば
@@ -47,7 +67,8 @@ export function ShoppingScreen() {
     const matched = favorites.find((p) => p.name.trim().toLowerCase() === normalizedRawName)
 
     if (matched) {
-      resolveWishlistItem(item.id, matched)
+      handleFastAdd(matched)
+      void removeWishlistItem(item.id)
     } else {
       setMatchingWishlistItem(item)
     }
@@ -83,9 +104,10 @@ export function ShoppingScreen() {
   ) {
     const savedProduct = await addFavoriteProduct(name, price, amount, unit, matchedProductId, matchedCategory)
     // 事前リストの「新しい商品として登録する」経由の場合は、
-    // 今登録したばかりの商品をそのままカートへ追加する
+    // 今入力したばかりの価格・内容量でそのままカートへ追加する
     if (wishlistIdToResolve !== null) {
-      resolveWishlistItem(wishlistIdToResolve, savedProduct)
+      addToCartWithDetails(savedProduct, { price, amount, unit, quantity: 1 })
+      void removeWishlistItem(wishlistIdToResolve)
       setWishlistIdToResolve(null)
     }
   }
@@ -172,33 +194,66 @@ export function ShoppingScreen() {
           {favorites.map((product) => {
             const cartItem = cartItems[product.id]
             const quantity = cartItem?.quantity ?? 0
+            const summary = purchaseSummaryByProduct[product.id]
+            // マイ定番棚に表示する価格・単価は、直近の購入実績があれば
+            // それを優先する(=「マイ定番棚の価格は直近の購入価格」という
+            // 方針)。まだ一度も買っていない商品は登録時の値を使う。
+            const suggested = getSuggestedCartDetails(product, summary)
+            const suggestedUnitPriceLabel = calcUnitPriceLabel({
+              ...product,
+              default_price: suggested.price,
+              amount: suggested.amount,
+              unit: suggested.unit,
+            })
+            const isPlannedButNotInCart = quantity === 0 && plannedProductIds.includes(product.id)
 
             return (
               <div
                 key={product.id}
-                className="flex flex-col rounded-xl bg-white p-3 shadow-sm"
+                className={`relative flex flex-col rounded-xl bg-white p-3 shadow-sm ${
+                  isPlannedButNotInCart ? 'ring-2 ring-costco-red-200' : ''
+                }`}
               >
+                {isPlannedButNotInCart && (
+                  <span className="absolute -top-2 right-2 rounded-full bg-costco-red-600 px-2 py-0.5 text-[10px] font-semibold text-white">
+                    未購入
+                  </span>
+                )}
                 <button
                   onClick={() => setHistoryProduct(product)}
                   className="mb-1 line-clamp-2 text-left text-sm font-medium text-slate-800 underline decoration-slate-300 underline-offset-2"
                 >
                   {product.name}
                 </button>
-                <span className="text-xs text-slate-400">
-                  ¥{(product.default_price ?? 0).toLocaleString()}
-                </span>
-                <span className="mb-3 text-xs font-medium text-costco-blue-600">
-                  {calcUnitPriceLabel(product) ?? ' '}
-                </span>
+                <div className="mb-3 flex items-center gap-1">
+                  <span className="text-sm font-semibold text-slate-800">
+                    ¥{suggested.price.toLocaleString()}
+                  </span>
+                  {summary && <span className="text-[10px] text-slate-400">(前回)</span>}
+                  {suggestedUnitPriceLabel && (
+                    <span className="ml-auto text-xs font-medium text-costco-blue-600">
+                      {suggestedUnitPriceLabel}
+                    </span>
+                  )}
+                </div>
 
                 {quantity === 0 ? (
-                  <button
-                    onClick={() => addToCart(product)}
-                    className="mt-auto flex items-center justify-center gap-1 rounded-lg bg-costco-red-600 py-2 text-sm font-semibold text-white transition-colors active:bg-costco-red-700"
-                  >
-                    <Plus className="h-4 w-4" />
-                    追加
-                  </button>
+                  <div className="mt-auto flex gap-1.5">
+                    <button
+                      onClick={() => handleFastAdd(product)}
+                      className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-costco-red-600 py-2 text-sm font-semibold text-white transition-colors active:bg-costco-red-700"
+                    >
+                      <Plus className="h-4 w-4" />
+                      追加
+                    </button>
+                    <button
+                      onClick={() => setQuickAddProduct(product)}
+                      className="flex items-center justify-center rounded-lg border border-slate-200 px-2.5 text-slate-500 active:bg-slate-100"
+                      aria-label="価格・内容量を入力してから追加"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                  </div>
                 ) : (
                   <div className="mt-auto flex items-center justify-between rounded-lg bg-slate-100 p-1">
                     <button
@@ -211,7 +266,7 @@ export function ShoppingScreen() {
                       {quantity}
                     </span>
                     <button
-                      onClick={() => addToCart(product)}
+                      onClick={() => incrementCartQuantity(product.id)}
                       className="rounded-md bg-white p-2 shadow-sm active:bg-slate-200"
                     >
                       <Plus className="h-4 w-4 text-slate-700" />
@@ -256,13 +311,26 @@ export function ShoppingScreen() {
         <ProductHistoryModal product={historyProduct} onClose={() => setHistoryProduct(null)} />
       )}
 
+      {quickAddProduct && (
+        <QuickAddModal
+          product={quickAddProduct}
+          summary={purchaseSummaryByProduct[quickAddProduct.id]}
+          onClose={() => setQuickAddProduct(null)}
+          onConfirm={(details) => {
+            addToCartWithDetails(quickAddProduct, details)
+            setQuickAddProduct(null)
+          }}
+        />
+      )}
+
       {matchingWishlistItem && (
         <WishlistMatchModal
           wishlistItem={matchingWishlistItem}
           favorites={favorites}
           onClose={() => setMatchingWishlistItem(null)}
           onPickExisting={(product) => {
-            resolveWishlistItem(matchingWishlistItem.id, product)
+            handleFastAdd(product)
+            void removeWishlistItem(matchingWishlistItem.id)
             setMatchingWishlistItem(null)
           }}
           onCreateNew={() => {
