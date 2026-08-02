@@ -117,7 +117,7 @@ export function EditFavoriteForm({ product, onClose }: Props) {
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="mb-4 w-full rounded-lg border border-slate-300 px-3 py-3 text-base focus:border-blue-600 focus:outline-none"
+          className="mb-4 w-full rounded-lg border border-slate-300 px-3 py-3 text-base focus:border-costco-blue-500 focus:outline-none"
         />
 
         <label className="mb-1 block text-xs font-medium text-slate-500">価格(円)</label>
@@ -126,7 +126,7 @@ export function EditFavoriteForm({ product, onClose }: Props) {
           inputMode="numeric"
           value={price}
           onChange={(e) => setPrice(e.target.value)}
-          className="mb-4 w-full rounded-lg border border-slate-300 px-3 py-3 text-base focus:border-blue-600 focus:outline-none"
+          className="mb-4 w-full rounded-lg border border-slate-300 px-3 py-3 text-base focus:border-costco-blue-500 focus:outline-none"
         />
 
         <label className="mb-1 block text-xs font-medium text-slate-500">
@@ -139,12 +139,12 @@ export function EditFavoriteForm({ product, onClose }: Props) {
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             placeholder="例:900"
-            className="w-1/2 rounded-lg border border-slate-300 px-3 py-3 text-base focus:border-blue-600 focus:outline-none"
+            className="w-1/2 rounded-lg border border-slate-300 px-3 py-3 text-base focus:border-costco-blue-500 focus:outline-none"
           />
           <select
             value={unit}
             onChange={(e) => setUnit(e.target.value)}
-            className="w-1/2 rounded-lg border border-slate-300 px-3 py-3 text-base focus:border-blue-600 focus:outline-none"
+            className="w-1/2 rounded-lg border border-slate-300 px-3 py-3 text-base focus:border-costco-blue-500 focus:outline-none"
           >
             {UNIT_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
@@ -163,7 +163,7 @@ export function EditFavoriteForm({ product, onClose }: Props) {
           value={category}
           onChange={(e) => setCategory(e.target.value)}
           placeholder="例:飲料"
-          className="mb-6 w-full rounded-lg border border-slate-300 px-3 py-3 text-base focus:border-blue-600 focus:outline-none"
+          className="mb-6 w-full rounded-lg border border-slate-300 px-3 py-3 text-base focus:border-costco-blue-500 focus:outline-none"
         />
         <datalist id="category-options">
           {categoryOptions.map((c) => (
@@ -174,7 +174,7 @@ export function EditFavoriteForm({ product, onClose }: Props) {
         <button
           onClick={handleSubmit}
           disabled={!canSubmit || isSaving}
-          className="mb-3 flex w-full items-center justify-center gap-2 rounded-xl bg-blue-700 px-4 py-3 font-bold text-white shadow disabled:opacity-50"
+          className="mb-3 flex w-full items-center justify-center gap-2 rounded-xl bg-costco-blue-700 px-4 py-3 font-semibold text-white shadow transition-colors active:bg-costco-blue-800 disabled:opacity-50"
         >
           {isSaving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Check className="h-5 w-5" />}
           保存する

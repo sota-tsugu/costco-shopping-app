@@ -131,10 +131,10 @@ export function AddProductForm({ onClose, onSubmit, initialName }: Props) {
             onChange={(e) => handleNameChange(e.target.value)}
             onFocus={() => setIsSuggestionsOpen(true)}
             placeholder="例:トイレットペーパー"
-            className="w-full rounded-lg border border-slate-300 px-3 py-3 text-base focus:border-blue-600 focus:outline-none"
+            className="w-full rounded-lg border border-slate-300 px-3 py-3 text-base focus:border-costco-blue-500 focus:outline-none"
           />
           {matchedProductId !== null && (
-            <span className="mt-1 block text-xs text-blue-700">定番棚の登録済み商品を選択中</span>
+            <span className="mt-1 block text-xs font-medium text-costco-blue-600">定番棚の登録済み商品を選択中</span>
           )}
           {isSuggestionsOpen && suggestions.length > 0 && (
             <ul className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
@@ -164,7 +164,7 @@ export function AddProductForm({ onClose, onSubmit, initialName }: Props) {
           value={price}
           onChange={(e) => setPrice(e.target.value)}
           placeholder="例:1580"
-          className="mb-4 w-full rounded-lg border border-slate-300 px-3 py-3 text-base focus:border-blue-600 focus:outline-none"
+          className="mb-4 w-full rounded-lg border border-slate-300 px-3 py-3 text-base focus:border-costco-blue-500 focus:outline-none"
         />
 
         <label className="mb-1 block text-xs font-medium text-slate-500">
@@ -177,12 +177,12 @@ export function AddProductForm({ onClose, onSubmit, initialName }: Props) {
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             placeholder="例:900"
-            className="w-1/2 rounded-lg border border-slate-300 px-3 py-3 text-base focus:border-blue-600 focus:outline-none"
+            className="w-1/2 rounded-lg border border-slate-300 px-3 py-3 text-base focus:border-costco-blue-500 focus:outline-none"
           />
           <select
             value={unit}
             onChange={(e) => setUnit(e.target.value)}
-            className="w-1/2 rounded-lg border border-slate-300 px-3 py-3 text-base focus:border-blue-600 focus:outline-none"
+            className="w-1/2 rounded-lg border border-slate-300 px-3 py-3 text-base focus:border-costco-blue-500 focus:outline-none"
           >
             {UNIT_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
@@ -191,12 +191,12 @@ export function AddProductForm({ onClose, onSubmit, initialName }: Props) {
             ))}
           </select>
         </div>
-        <p className="mb-6 h-4 text-xs text-blue-700">{unitPriceLabel}</p>
+        <p className="mb-6 h-4 text-xs font-medium text-costco-blue-600">{unitPriceLabel}</p>
 
         <button
           onClick={handleSubmit}
           disabled={!canSubmit || isSaving}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-700 px-4 py-3 font-bold text-white shadow disabled:opacity-50"
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-costco-red-600 px-4 py-3 font-semibold text-white shadow transition-colors active:bg-costco-red-700 disabled:opacity-50"
         >
           {isSaving ? <Loader2 className="h-5 w-5 animate-spin" /> : null}
           追加する

@@ -124,7 +124,7 @@ export function ProductHistoryModal({ product, onClose }: Props) {
       <div className="max-h-[80vh] w-full max-w-sm overflow-y-auto rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-2xl">
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <History className="h-5 w-5 text-blue-700" />
+            <History className="h-5 w-5 text-costco-blue-600" />
             <h2 className="text-base font-bold text-slate-800">{product.name}</h2>
           </div>
           <button onClick={onClose} className="rounded-full p-1 text-slate-400 hover:bg-slate-100">
@@ -144,12 +144,12 @@ export function ProductHistoryModal({ product, onClose }: Props) {
                 autoFocus
                 value={priceInput}
                 onChange={(e) => setPriceInput(e.target.value)}
-                className="w-24 rounded border border-slate-300 px-2 py-1 text-lg font-bold focus:border-blue-600 focus:outline-none"
+                className="w-24 rounded border border-slate-300 px-2 py-1 text-lg font-bold focus:border-costco-blue-500 focus:outline-none"
               />
               <button
                 onClick={handleSavePrice}
                 disabled={isSavingPrice}
-                className="ml-auto flex items-center gap-1 rounded-lg bg-blue-700 px-3 py-1.5 text-sm font-bold text-white disabled:opacity-50"
+                className="ml-auto flex items-center gap-1 rounded-lg bg-costco-blue-700 px-3 py-1.5 text-sm font-semibold text-white transition-colors active:bg-costco-blue-800 disabled:opacity-50"
               >
                 {isSavingPrice ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
                 保存
@@ -162,7 +162,7 @@ export function ProductHistoryModal({ product, onClose }: Props) {
                   ¥{(product.default_price ?? 0).toLocaleString()}
                 </span>
                 {currentComparable.unitLabel && (
-                  <span className="text-xs text-blue-700">{formatComparable(currentComparable)}</span>
+                  <span className="text-xs font-medium text-costco-blue-600">{formatComparable(currentComparable)}</span>
                 )}
                 <button
                   onClick={() => {
@@ -239,7 +239,7 @@ export function ProductHistoryModal({ product, onClose }: Props) {
                     {(rowComparable.unitLabel || diffResult) && (
                       <div className="mt-1 flex items-center justify-end gap-2 text-xs">
                         {rowComparable.unitLabel && (
-                          <span className="text-blue-700">{formatComparable(rowComparable)}</span>
+                          <span className="text-costco-blue-600">{formatComparable(rowComparable)}</span>
                         )}
                         {diffResult && (
                           <PriceDiffBadge diff={diffResult.diff} unitLabel={diffResult.unitLabel} />

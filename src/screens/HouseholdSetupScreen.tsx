@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Users, Loader2, Copy, Check } from 'lucide-react'
 import { createNewHousehold, joinHousehold } from '../firebase/household'
 import { migrateLocalDataToHousehold } from '../firebase/migrateLocalData'
+import { TricolorAccent } from '../components/TricolorAccent'
 
 // アプリを初めて開いた端末で表示される、家族コードの設定画面。
 // 「新しい家族を作る」か「既にある家族コードで参加する」かを選ぶ。
@@ -67,10 +68,12 @@ export function HouseholdSetupScreen({ onReady }: Props) {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-slate-50 px-6">
-      <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-sm">
+      <div className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-sm">
+        <TricolorAccent />
+        <div className="p-6">
         <div className="mb-4 flex justify-center">
-          <div className="rounded-full bg-blue-100 p-4">
-            <Users className="h-8 w-8 text-blue-700" />
+          <div className="rounded-full bg-costco-blue-50 p-4">
+            <Users className="h-8 w-8 text-costco-blue-600" />
           </div>
         </div>
 
@@ -90,7 +93,7 @@ export function HouseholdSetupScreen({ onReady }: Props) {
             <button
               onClick={handleCreate}
               disabled={isWorking}
-              className="mb-3 flex w-full items-center justify-center gap-2 rounded-xl bg-blue-700 px-4 py-4 text-base font-bold text-white shadow disabled:opacity-50"
+              className="mb-3 flex w-full items-center justify-center gap-2 rounded-xl bg-costco-red-600 px-4 py-4 text-base font-semibold text-white shadow transition-colors active:bg-costco-red-700 disabled:opacity-50"
             >
               {isWorking ? <Loader2 className="h-5 w-5 animate-spin" /> : null}
               新しく家族を作る
@@ -122,13 +125,13 @@ export function HouseholdSetupScreen({ onReady }: Props) {
               value={joinCodeInput}
               onChange={(e) => setJoinCodeInput(e.target.value)}
               placeholder="例:K3F9-7QXP-2MRT"
-              className="mb-4 w-full rounded-lg border border-slate-300 px-3 py-3 text-center text-lg tracking-wider focus:border-blue-600 focus:outline-none"
+              className="mb-4 w-full rounded-lg border border-slate-300 px-3 py-3 text-center text-lg tracking-wider focus:border-costco-blue-500 focus:outline-none"
             />
 
             <button
               onClick={handleJoin}
               disabled={isWorking || joinCodeInput.trim().length === 0}
-              className="mb-3 flex w-full items-center justify-center gap-2 rounded-xl bg-blue-700 px-4 py-4 text-base font-bold text-white shadow disabled:opacity-50"
+              className="mb-3 flex w-full items-center justify-center gap-2 rounded-xl bg-costco-red-600 px-4 py-4 text-base font-semibold text-white shadow transition-colors active:bg-costco-red-700 disabled:opacity-50"
             >
               {isWorking ? <Loader2 className="h-5 w-5 animate-spin" /> : null}
               参加する
@@ -160,12 +163,13 @@ export function HouseholdSetupScreen({ onReady }: Props) {
 
             <button
               onClick={onReady}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-700 px-4 py-4 text-base font-bold text-white shadow"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-costco-red-600 px-4 py-4 text-base font-semibold text-white shadow transition-colors active:bg-costco-red-700"
             >
               始める
             </button>
           </>
         )}
+        </div>
       </div>
     </div>
   )

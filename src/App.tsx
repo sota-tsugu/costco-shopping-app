@@ -50,7 +50,7 @@ function App() {
     if (screen === 'loading') {
       return (
         <div className="flex min-h-screen items-center justify-center gap-2 bg-slate-50 text-slate-500">
-          <Loader2 className="h-5 w-5 animate-spin" />
+          <Loader2 className="h-5 w-5 animate-spin text-costco-blue-600" />
           <span>読み込んでいます…</span>
         </div>
       )

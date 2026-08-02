@@ -62,7 +62,7 @@ export function SettingsModal({ onClose }: Props) {
 
         <div className="mb-4 rounded-lg bg-slate-50 p-4">
           <div className="mb-2 flex items-center gap-1.5 text-sm font-medium text-slate-600">
-            <Users className="h-4 w-4 text-blue-700" />
+            <Users className="h-4 w-4 text-costco-blue-600" />
             この端末の家族コード
           </div>
           <div className="mb-3 flex items-center justify-center gap-2 rounded-lg bg-white p-3">
@@ -99,7 +99,7 @@ export function SettingsModal({ onClose }: Props) {
           <button
             onClick={handleUpdate}
             disabled={isUpdating}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-700 px-4 py-3 font-bold text-white shadow disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-costco-red-600 px-4 py-3 font-semibold text-white shadow transition-colors active:bg-costco-red-700 disabled:opacity-50"
           >
             {isUpdating ? (
               <Loader2 className="h-5 w-5 animate-spin" />

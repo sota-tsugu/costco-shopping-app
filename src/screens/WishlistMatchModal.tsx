@@ -44,13 +44,13 @@ export function WishlistMatchModal({ wishlistItem, favorites, onPickExisting, on
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="定番棚の商品を検索"
-            className="w-full rounded-lg border border-slate-300 py-2 pl-9 pr-3 text-sm focus:border-blue-600 focus:outline-none"
+            className="w-full rounded-lg border border-slate-300 py-2 pl-9 pr-3 text-sm focus:border-costco-blue-500 focus:outline-none"
           />
         </div>
 
         <button
           onClick={onCreateNew}
-          className="mb-3 flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-300 py-3 text-sm font-medium text-slate-500"
+          className="mb-3 flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-costco-red-200 py-3 text-sm font-medium text-costco-red-600 transition-colors active:bg-costco-red-50"
         >
           <PlusCircle className="h-4 w-4" />
           新しい商品として登録する

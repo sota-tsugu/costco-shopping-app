@@ -5,6 +5,7 @@ import { toComparableValue, diffComparableValues } from '../utils/priceCompare'
 import { PriceDiffBadge } from '../components/PriceDiffBadge'
 import { SettingsModal } from './SettingsModal'
 import { ManageFavoritesModal } from './ManageFavoritesModal'
+import { TricolorAccent } from '../components/TricolorAccent'
 
 // 買い物を始める前に、今回の見込み合計金額と「今回買う予定のもの」を
 // 確認する画面。企画書の方針により「予算は買い物1回ごと」に設定する
@@ -237,31 +238,32 @@ export function BudgetSetupScreen() {
   return (
     <div className="min-h-screen bg-slate-50 pb-28">
       {/* 上部固定:見込み合計・予算(ShoppingScreenの買い物中画面と同じ構成に揃えている) */}
-      <header className="sticky top-0 z-10 bg-blue-800 px-4 pb-4 pt-5 text-white shadow">
-        <div className="mb-1 flex items-center justify-end">
+      <header className="sticky top-0 z-10 bg-costco-blue-700 px-4 pb-4 pt-4 text-white shadow-md">
+        <TricolorAccent />
+        <div className="mb-1 mt-3 flex items-center justify-end">
           <button
             onClick={() => setIsSettingsOpen(true)}
-            className="rounded-full p-1 text-blue-200 hover:bg-blue-700"
+            className="rounded-full p-1 text-costco-blue-100 transition-colors hover:bg-costco-blue-600"
             aria-label="設定"
           >
             <Settings className="h-5 w-5" />
           </button>
         </div>
         <div className="flex items-end justify-between">
-          <span className="text-sm text-blue-100">見込み合計(チェック中の商品)</span>
-          <span className="text-3xl font-bold">¥{estimatedTotal.toLocaleString()}</span>
+          <span className="text-sm text-costco-blue-100">見込み合計(チェック中の商品)</span>
+          <span className="text-3xl font-semibold tracking-tight">¥{estimatedTotal.toLocaleString()}</span>
         </div>
 
         <div className="mt-3">
-          <div className="h-3 w-full overflow-hidden rounded-full bg-blue-900/50">
+          <div className="h-2.5 w-full overflow-hidden rounded-full bg-black/20">
             <div
               className={`h-full rounded-full transition-all ${
-                isOverBudget ? 'bg-red-400' : 'bg-white'
+                isOverBudget ? 'bg-costco-red-400' : 'bg-white'
               }`}
               style={{ width: `${progressRatio * 100}%` }}
             />
           </div>
-          <div className="mt-1 flex items-center justify-between text-xs text-blue-100">
+          <div className="mt-1 flex items-center justify-between text-xs text-costco-blue-100">
             <span>予算</span>
             <span className="flex items-center gap-0.5">
               ¥
@@ -270,12 +272,12 @@ export function BudgetSetupScreen() {
                 inputMode="numeric"
                 value={budgetInput}
                 onChange={(e) => setBudgetInput(e.target.value)}
-                className="w-20 border-b border-blue-300 bg-transparent text-right text-white focus:outline-none"
+                className="w-20 border-b border-costco-blue-300 bg-transparent text-right text-white focus:outline-none"
               />
             </span>
           </div>
           {isOverBudget && (
-            <div className="mt-1 text-right text-xs font-bold text-red-200">予算オーバー</div>
+            <div className="mt-1 text-right text-xs font-semibold text-costco-red-200">予算オーバー</div>
           )}
         </div>
       </header>
@@ -329,7 +331,7 @@ export function BudgetSetupScreen() {
                     value={planListQuery}
                     onChange={(e) => setPlanListQuery(e.target.value)}
                     placeholder="商品名で絞り込み"
-                    className="w-full rounded-lg border border-slate-300 py-2 pl-9 pr-3 text-sm focus:border-blue-600 focus:outline-none"
+                    className="w-full rounded-lg border border-slate-300 py-2 pl-9 pr-3 text-sm focus:border-costco-blue-500 focus:outline-none"
                   />
                 </div>
 
@@ -372,7 +374,7 @@ export function BudgetSetupScreen() {
                                 >
                                   <span
                                     className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 ${
-                                      checked ? 'border-blue-700 bg-blue-700' : 'border-slate-300'
+                                      checked ? 'border-costco-red-600 bg-costco-red-600' : 'border-slate-300'
                                     }`}
                                   >
                                     {checked && <Check className="h-3.5 w-3.5 text-white" />}
@@ -420,7 +422,7 @@ export function BudgetSetupScreen() {
         {/* 事前買い物予定リスト(定番棚にない、今回だけ欲しいもの) */}
         <div className="mt-6 rounded-2xl bg-white p-6 shadow-sm">
           <h2 className="mb-1 flex items-center gap-1.5 font-semibold text-slate-800">
-            <ClipboardList className="h-4 w-4 text-blue-700" />
+            <ClipboardList className="h-4 w-4 text-costco-blue-600" />
             今回だけ買いたいもの(メモ)
           </h2>
           <p className="mb-4 text-xs text-slate-500">
@@ -438,7 +440,7 @@ export function BudgetSetupScreen() {
                   if (e.key === 'Enter') handleAddWishlistItem()
                 }}
                 placeholder="例:トイペ"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-600 focus:outline-none"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-costco-blue-500 focus:outline-none"
               />
               {isWishlistSuggestionsOpen && groupedWishlistSuggestions.length > 0 && (
                 <div className="absolute z-10 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
@@ -469,7 +471,7 @@ export function BudgetSetupScreen() {
             <button
               onClick={handleAddWishlistItem}
               disabled={isAddingWishlistItem || wishlistInput.trim().length === 0}
-              className="flex shrink-0 items-center justify-center rounded-lg bg-blue-700 px-3 text-white disabled:opacity-40"
+              className="flex shrink-0 items-center justify-center rounded-lg bg-costco-red-600 px-3 text-white transition-colors active:bg-costco-red-700 disabled:opacity-40"
             >
               <Plus className="h-5 w-5" />
             </button>
@@ -504,7 +506,7 @@ export function BudgetSetupScreen() {
         <button
           onClick={handleStart}
           disabled={isStarting}
-          className="mx-auto flex w-full max-w-sm items-center justify-center gap-2 rounded-xl bg-blue-700 px-4 py-4 text-lg font-bold text-white shadow disabled:opacity-50"
+          className="mx-auto flex w-full max-w-sm items-center justify-center gap-2 rounded-xl bg-costco-red-600 px-4 py-4 text-lg font-semibold text-white shadow transition-colors active:bg-costco-red-700 disabled:opacity-50"
         >
           {isStarting ? <Loader2 className="h-5 w-5 animate-spin" /> : null}
           買い物を始める

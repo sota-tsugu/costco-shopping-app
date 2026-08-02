@@ -5,6 +5,7 @@ import { AddProductForm } from './AddProductForm'
 import { ProductHistoryModal } from './ProductHistoryModal'
 import { WishlistMatchModal } from './WishlistMatchModal'
 import { SettingsModal } from './SettingsModal'
+import { TricolorAccent } from '../components/TricolorAccent'
 
 // 買い物中のメイン画面。
 // UI/UXの4原則(企画書 6章)を意識したレイアウト:
@@ -92,33 +93,34 @@ export function ShoppingScreen() {
   return (
     <div className="min-h-screen bg-slate-50 pb-28">
       {/* 上部固定:合計金額・予算進捗(視線移動の最小化) */}
-      <header className="sticky top-0 z-10 bg-blue-800 px-4 pb-4 pt-5 text-white shadow">
-        <div className="mb-1 flex items-center justify-end">
+      <header className="sticky top-0 z-10 bg-costco-blue-700 px-4 pb-4 pt-4 text-white shadow-md">
+        <TricolorAccent />
+        <div className="mb-1 mt-3 flex items-center justify-end">
           <button
             onClick={() => setIsSettingsOpen(true)}
-            className="rounded-full p-1 text-blue-200 hover:bg-blue-700"
+            className="rounded-full p-1 text-costco-blue-100 transition-colors hover:bg-costco-blue-600"
             aria-label="設定"
           >
             <Settings className="h-5 w-5" />
           </button>
         </div>
         <div className="flex items-end justify-between">
-          <span className="text-sm text-blue-100">合計金額</span>
-          <span className="text-3xl font-bold">¥{total.toLocaleString()}</span>
+          <span className="text-sm text-costco-blue-100">合計金額</span>
+          <span className="text-3xl font-semibold tracking-tight">¥{total.toLocaleString()}</span>
         </div>
 
         <div className="mt-3">
-          <div className="h-3 w-full overflow-hidden rounded-full bg-blue-900/50">
+          <div className="h-2.5 w-full overflow-hidden rounded-full bg-black/20">
             <div
               className={`h-full rounded-full transition-all ${
-                isOverBudget ? 'bg-red-400' : 'bg-white'
+                isOverBudget ? 'bg-costco-red-400' : 'bg-white'
               }`}
               style={{ width: `${progressRatio * 100}%` }}
             />
           </div>
-          <div className="mt-1 flex justify-between text-xs text-blue-100">
+          <div className="mt-1 flex justify-between text-xs text-costco-blue-100">
             <span>予算 ¥{budget.toLocaleString()}</span>
-            {isOverBudget && <span className="font-bold text-red-200">予算オーバー</span>}
+            {isOverBudget && <span className="font-semibold text-costco-red-200">予算オーバー</span>}
           </div>
         </div>
       </header>
@@ -128,7 +130,7 @@ export function ShoppingScreen() {
         {wishlist.length > 0 && (
           <section className="mb-5">
             <h2 className="mb-2 flex items-center gap-1.5 font-semibold text-slate-800">
-              <ClipboardList className="h-4 w-4 text-blue-700" />
+              <ClipboardList className="h-4 w-4 text-costco-blue-600" />
               事前リストから追加
             </h2>
             <ul className="space-y-2">
@@ -141,7 +143,7 @@ export function ShoppingScreen() {
                     onClick={() => handleWishlistTap(item)}
                     className="flex flex-1 items-center gap-2 text-left text-sm font-medium text-slate-800"
                   >
-                    <Plus className="h-4 w-4 shrink-0 text-blue-700" />
+                    <Plus className="h-4 w-4 shrink-0 text-costco-red-600" />
                     {item.raw_name}
                   </button>
                   <button
@@ -185,14 +187,14 @@ export function ShoppingScreen() {
                 <span className="text-xs text-slate-400">
                   ¥{(product.default_price ?? 0).toLocaleString()}
                 </span>
-                <span className="mb-3 text-xs text-blue-700">
+                <span className="mb-3 text-xs font-medium text-costco-blue-600">
                   {calcUnitPriceLabel(product) ?? ' '}
                 </span>
 
                 {quantity === 0 ? (
                   <button
                     onClick={() => addToCart(product)}
-                    className="mt-auto flex items-center justify-center gap-1 rounded-lg bg-blue-700 py-2 text-sm font-bold text-white"
+                    className="mt-auto flex items-center justify-center gap-1 rounded-lg bg-costco-red-600 py-2 text-sm font-semibold text-white transition-colors active:bg-costco-red-700"
                   >
                     <Plus className="h-4 w-4" />
                     追加
@@ -222,7 +224,7 @@ export function ShoppingScreen() {
 
           <button
             onClick={() => setIsAddFormOpen(true)}
-            className="flex min-h-[104px] flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-slate-300 text-slate-400"
+            className="flex min-h-[104px] flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-slate-300 text-slate-400 transition-colors active:border-costco-blue-300 active:text-costco-blue-500"
           >
             <PlusCircle className="h-6 w-6" />
             <span className="text-sm">商品を追加</span>
@@ -235,7 +237,7 @@ export function ShoppingScreen() {
         <button
           onClick={handleCheckout}
           disabled={cartItemCount === 0 || isCheckingOut}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-green-600 px-4 py-4 text-lg font-bold text-white shadow disabled:opacity-40"
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-green-600 px-4 py-4 text-lg font-semibold text-white shadow transition-colors active:bg-green-700 disabled:opacity-40"
         >
           <CheckCircle2 className="h-5 w-5" />
           会計を完了する
