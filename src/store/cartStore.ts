@@ -110,6 +110,18 @@ type CartState = {
     matchedCategory?: string | null,
   ) => Promise<Product>
   updateProductPrice: (productId: string, price: number) => Promise<void>
+  /** マイ定番棚管理画面からの編集。名前・価格・内容量・単位・カテゴリをまとめて更新する */
+  updateFavoriteProduct: (
+    productId: string,
+    updates: { name: string; price: number; amount: number | null; unit: string | null; category: string | null },
+  ) => Promise<void>
+  /**
+   * マイ定番棚から外す(ソフトデリート)。商品ドキュメント自体や過去の
+   * 購入履歴(Purchase)は消さず、isFavoriteをfalseにするだけにとどめる。
+   * 実際に削除してしまうと、値上がり/値下がり比較などで使っている
+   * 過去の購入履歴が参照する商品情報を失ってしまうため。
+   */
+  removeFavoriteProduct: (productId: string) => Promise<void>
   completeCheckout: () => Promise<void>
   addWishlistItem: (rawName: string) => Promise<void>
   removeWishlistItem: (wishlistId: string) => Promise<void>
@@ -445,6 +457,24 @@ export const useCartStore = create<CartState>((set, get) => ({
     const householdId = requireHouseholdId()
     await updateDoc(doc(householdCollection(householdId, 'products'), productId), {
       defaultPrice: price,
+    })
+  },
+
+  async updateFavoriteProduct(productId, updates) {
+    const householdId = requireHouseholdId()
+    await updateDoc(doc(householdCollection(householdId, 'products'), productId), {
+      name: updates.name,
+      defaultPrice: updates.price,
+      amount: updates.amount,
+      unit: updates.unit,
+      category: updates.category,
+    })
+  },
+
+  async removeFavoriteProduct(productId) {
+    const householdId = requireHouseholdId()
+    await updateDoc(doc(householdCollection(householdId, 'products'), productId), {
+      isFavorite: false,
     })
   },
 

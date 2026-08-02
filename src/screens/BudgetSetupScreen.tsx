@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Loader2, ClipboardList, Plus, X, Check, ChevronDown, Search, Settings } from 'lucide-react'
+import { Loader2, ClipboardList, Plus, X, Check, ChevronDown, Search, Settings, ListPlus } from 'lucide-react'
 import { useCartStore, searchProductCatalog, type Product, type CatalogSuggestion } from '../store/cartStore'
 import { toComparableValue, diffComparableValues } from '../utils/priceCompare'
 import { PriceDiffBadge } from '../components/PriceDiffBadge'
 import { SettingsModal } from './SettingsModal'
+import { ManageFavoritesModal } from './ManageFavoritesModal'
 
 // 買い物を始める前に、今回の見込み合計金額と「今回買う予定のもの」を
 // 確認する画面。企画書の方針により「予算は買い物1回ごと」に設定する
@@ -44,6 +45,7 @@ export function BudgetSetupScreen() {
   const [wishlistInput, setWishlistInput] = useState('')
   const [isAddingWishlistItem, setIsAddingWishlistItem] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [isManageFavoritesOpen, setIsManageFavoritesOpen] = useState(false)
 
   // 事前リスト(メモ)の入力中に出す予測変換。商品名候補データベース+
   // マイ定番棚から検索する(AddProductForm.tsxと同じ仕組み)。
@@ -280,26 +282,45 @@ export function BudgetSetupScreen() {
 
       <div className="mx-auto max-w-sm px-6 py-6">
         {/* 今回買う予定(マイ定番棚のチェックリスト。カテゴリ別に表示) */}
-        {favorites.length > 0 && (
-          <div className="rounded-2xl bg-white p-6 shadow-sm">
+        <div className="rounded-2xl bg-white p-6 shadow-sm">
+          <div className="flex items-center justify-between gap-2">
+            {favorites.length > 0 ? (
+              <button
+                onClick={() => setIsPlanListExpanded((v) => !v)}
+                className="flex flex-1 items-center justify-between"
+              >
+                <div className="text-left">
+                  <h2 className="font-semibold text-slate-800">今回買う予定</h2>
+                  <p className="text-xs text-slate-500">
+                    {favorites.length}点中{checkedCount}点選択中(不要なものだけ外してください)
+                  </p>
+                </div>
+                <ChevronDown
+                  className={`h-5 w-5 shrink-0 text-slate-400 transition-transform ${
+                    isPlanListExpanded ? 'rotate-180' : ''
+                  }`}
+                />
+              </button>
+            ) : (
+              <h2 className="font-semibold text-slate-800">今回買う予定</h2>
+            )}
             <button
-              onClick={() => setIsPlanListExpanded((v) => !v)}
-              className="flex w-full items-center justify-between"
+              onClick={() => setIsManageFavoritesOpen(true)}
+              className="flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-500"
             >
-              <div className="text-left">
-                <h2 className="font-semibold text-slate-800">今回買う予定</h2>
-                <p className="text-xs text-slate-500">
-                  {favorites.length}点中{checkedCount}点選択中(不要なものだけ外してください)
-                </p>
-              </div>
-              <ChevronDown
-                className={`h-5 w-5 shrink-0 text-slate-400 transition-transform ${
-                  isPlanListExpanded ? 'rotate-180' : ''
-                }`}
-              />
+              <ListPlus className="h-3.5 w-3.5" />
+              管理
             </button>
+          </div>
 
-            {isPlanListExpanded && (
+          {favorites.length === 0 && (
+            <p className="mt-3 text-xs text-slate-400">
+              まだマイ定番棚に商品が登録されていません。「管理」から買い物前に登録しておけます。
+            </p>
+          )}
+
+          {favorites.length > 0 &&
+            (isPlanListExpanded && (
               <div className="mt-4">
                 <div className="relative mb-3">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -393,9 +414,8 @@ export function BudgetSetupScreen() {
                   )}
                 </div>
               </div>
-            )}
-          </div>
-        )}
+            ))}
+        </div>
 
         {/* 事前買い物予定リスト(定番棚にない、今回だけ欲しいもの) */}
         <div className="mt-6 rounded-2xl bg-white p-6 shadow-sm">
@@ -492,6 +512,9 @@ export function BudgetSetupScreen() {
       </div>
 
       {isSettingsOpen && <SettingsModal onClose={() => setIsSettingsOpen(false)} />}
+      {isManageFavoritesOpen && (
+        <ManageFavoritesModal onClose={() => setIsManageFavoritesOpen(false)} />
+      )}
     </div>
   )
 }
