@@ -45,6 +45,8 @@ STEP1(フェーズ1-a)で行ったこと:
   - リストが長くなる想定への対応として、複数列レイアウトは不採用(SOTAさんの意向)にし、代わりに「①購入回数が多い順に並び替え、②検索で絞り込み、③全部チェック/全部外すの一括操作、④初期状態は折りたたみ表示(◯点中◯点選択中の要約のみ)」の組み合わせで対応
   - 各商品に「前回購入価格」を表示(`cartStore.ts`の`purchaseSummaryByProduct`で商品ごとの直近価格・購入回数をinit()時と会計完了後にまとめて集計)。現在価格との比較ロジックは`src/utils/priceCompare.ts`、バッジ表示は`src/components/PriceDiffBadge.tsx`に共通化し、`ProductHistoryModal.tsx`と両方から利用
 
+- 商品名の入力候補データベース(`src/data/productCatalog.ts`。costcotuu.comのカテゴリ別商品レビュー記事一覧、約3200件をSOTAさんが提供し、`src/db/worker.ts`のschema_version 5マイグレーションでis_favorite=0の商品として一括投入)。「マイ定番棚」(実際に買う商品)とは別物で、商品追加フォーム・事前リストの入力補助にのみ使う。`AddProductForm.tsx`で商品名を2文字以上入力すると候補が出て、選ぶとその商品を定番棚に「昇格」させる(is_favorite=1に更新)ことで重複登録を防ぐ設計。`cartStore.ts`の`searchProductCatalog`で検索
+
 まだ実装していないもの(フェーズ1-b残り・以降):
 - 事前買い物予定リスト機能内のProductAlias(表記ゆれ吸収・一度紐付けた組み合わせの記憶)
 - 複数店舗対応(Store)、家族メンバー対応(FamilyMember)、シンプル/パワーユーザーモード切り替え

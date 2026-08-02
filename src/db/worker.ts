@@ -12,6 +12,7 @@ import initSqlJs, { type Database, type SqlJsStatic } from 'sql.js'
 // を静的アセットとしてバンドルする。これによりPWAのキャッシュ対象にも
 // 自動的に含まれる。
 import sqlWasmUrl from 'sql.js/dist/sql-wasm.wasm?url'
+import { PRODUCT_CATALOG } from '../data/productCatalog'
 
 type RequestMessage =
   | { id: number; type: 'init'; payload: { bytes: ArrayBuffer | null } }
@@ -41,7 +42,10 @@ async function ensureSqlJsLoaded(): Promise<SqlJsStatic> {
 type Migration = {
   version: number
   description: string
-  statements: string[]
+  /** 通常のテーブル定義変更(CREATE TABLE/ALTER TABLEなど) */
+  statements?: string[]
+  /** データの投入など、SQL文字列だけでは書きにくい処理はここに書く */
+  seed?: (database: Database) => void
 }
 
 const MIGRATIONS: Migration[] = [
@@ -112,6 +116,25 @@ const MIGRATIONS: Migration[] = [
       );`,
     ],
   },
+  {
+    version: 5,
+    description:
+      '商品名の入力候補データベースを投入(costcotuu.comのカテゴリ別商品一覧より)。' +
+      'is_favorite=0で登録し、マイ定番棚には表示されない。商品追加・事前リストの入力時に候補として使う',
+    seed: (database) => {
+      const now = new Date().toISOString()
+      const stmt = database.prepare(
+        'INSERT INTO product (name, category, is_favorite, created_at) VALUES (?, ?, 0, ?)',
+      )
+      try {
+        for (const entry of PRODUCT_CATALOG) {
+          stmt.run([entry.name, entry.category, now])
+        }
+      } finally {
+        stmt.free()
+      }
+    },
+  },
 ]
 
 function runMigrations(database: Database) {
@@ -130,8 +153,11 @@ function runMigrations(database: Database) {
   )
 
   for (const migration of pending) {
-    for (const statement of migration.statements) {
+    for (const statement of migration.statements ?? []) {
       database.run(statement)
+    }
+    if (migration.seed) {
+      migration.seed(database)
     }
     database.run('INSERT INTO schema_version (version, applied_at) VALUES (?, ?)', [
       migration.version,

@@ -101,6 +101,8 @@ type CartState = {
     price: number,
     amount: number | null,
     unit: string | null,
+    /** 商品名候補データベースなどから既存商品を選んだ場合、その商品idを渡す */
+    matchedProductId?: number | null,
   ) => Promise<void>
   updateProductPrice: (productId: number, price: number) => Promise<void>
   completeCheckout: () => Promise<void>
@@ -125,6 +127,21 @@ export function calcUnitPriceLabel(product: Product): string | null {
   }
   const unitPrice = product.default_price / product.amount
   return `¥${unitPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })} / ${product.unit}`
+}
+
+/**
+ * 商品名の入力補助のため、商品マスター全体(定番棚に入っていない
+ * 商品名候補データベースも含む)から名前で検索する。
+ * 商品追加フォームや事前リストの入力時に使う。
+ */
+export async function searchProductCatalog(query: string, limit = 15): Promise<Product[]> {
+  const trimmed = query.trim()
+  if (trimmed.length === 0) return []
+  const result = await dbClient.exec(
+    'SELECT id, name, category, amount, unit, default_price, is_favorite, created_at FROM product WHERE name LIKE ? ORDER BY is_favorite DESC, name LIMIT ?',
+    [`%${trimmed}%`, limit],
+  )
+  return rowsToObjects<Product>(result)
 }
 
 /**
@@ -360,28 +377,76 @@ export const useCartStore = create<CartState>((set, get) => ({
     })
   },
 
-  async addFavoriteProduct(name: string, price: number, amount: number | null, unit: string | null) {
+  /**
+   * 定番棚に商品を追加する。
+   * - 商品名候補データベース(is_favorite=0で登録済みの商品)から選んだ場合は
+   *   matchedProductIdを渡す。その商品を新規作成せず「定番棚に昇格」させる
+   *   (同じ名前の商品が重複して登録されるのを防ぐため)
+   * - matchedProductIdがなくても、たまたま同じ名前の商品が既にあれば
+   *   それを使い回す(念のための保険)
+   * - どちらにも当てはまらなければ、新しい商品として登録する
+   */
+  async addFavoriteProduct(
+    name: string,
+    price: number,
+    amount: number | null,
+    unit: string | null,
+    matchedProductId: number | null = null,
+  ) {
     const now = new Date().toISOString()
-    await dbClient.run(
-      'INSERT INTO product (name, default_price, amount, unit, is_favorite, created_at) VALUES (?, ?, ?, ?, 1, ?)',
-      [name, price, amount, unit, now],
-    )
-    const idResult = await dbClient.exec('SELECT last_insert_rowid() AS id')
-    const [{ id }] = rowsToObjects<{ id: number }>(idResult)
+    let targetId = matchedProductId
 
-    const newProduct: Product = {
-      id,
-      name,
-      category: null,
-      amount,
-      unit,
-      default_price: price,
-      is_favorite: 1,
-      created_at: now,
+    if (targetId === null) {
+      const existingResult = await dbClient.exec('SELECT id FROM product WHERE name = ? LIMIT 1', [
+        name,
+      ])
+      const existingRows = rowsToObjects<{ id: number }>(existingResult)
+      if (existingRows.length > 0) {
+        targetId = existingRows[0].id
+      }
+    }
+
+    let resultProduct: Product
+
+    if (targetId !== null) {
+      await dbClient.run(
+        'UPDATE product SET default_price = ?, amount = ?, unit = ?, is_favorite = 1 WHERE id = ?',
+        [price, amount, unit, targetId],
+      )
+      const rowResult = await dbClient.exec(
+        'SELECT id, name, category, amount, unit, default_price, is_favorite, created_at FROM product WHERE id = ?',
+        [targetId],
+      )
+      resultProduct = rowsToObjects<Product>(rowResult)[0]
+    } else {
+      await dbClient.run(
+        'INSERT INTO product (name, default_price, amount, unit, is_favorite, created_at) VALUES (?, ?, ?, ?, 1, ?)',
+        [name, price, amount, unit, now],
+      )
+      const idResult = await dbClient.exec('SELECT last_insert_rowid() AS id')
+      const [{ id }] = rowsToObjects<{ id: number }>(idResult)
+      resultProduct = {
+        id,
+        name,
+        category: null,
+        amount,
+        unit,
+        default_price: price,
+        is_favorite: 1,
+        created_at: now,
+      }
     }
 
     await dbClient.persist()
-    set((state) => ({ favorites: [newProduct, ...state.favorites] }))
+    set((state) => {
+      const alreadyListed = state.favorites.some((p) => p.id === resultProduct.id)
+      if (alreadyListed) {
+        return {
+          favorites: state.favorites.map((p) => (p.id === resultProduct.id ? resultProduct : p)),
+        }
+      }
+      return { favorites: [resultProduct, ...state.favorites] }
+    })
   },
 
   /**

@@ -75,8 +75,9 @@ export function ShoppingScreen() {
     price: number,
     amount: number | null,
     unit: string | null,
+    matchedProductId?: number | null,
   ) {
-    await addFavoriteProduct(name, price, amount, unit)
+    await addFavoriteProduct(name, price, amount, unit, matchedProductId)
     // 事前リストの「新しい商品として登録する」経由の場合は、
     // 今できたばかりの商品(favoritesの先頭に追加される)をそのままカートへ
     if (wishlistIdToResolve !== null) {
