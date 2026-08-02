@@ -86,7 +86,7 @@ SOTAさんから「パートナーと共有して使いたい」との要望が�
 
 ### 移行中の一時的な資産(削除予定)
 
-- `src/db/worker.ts` / `src/db/dbClient.ts` / `src/db/persistence.ts`:以前のsql.js実装。`src/firebase/migrateLocalData.ts`(既存データの一度きりの引き継ぎ)からのみ参照されている。**移行が問題なく完了したことを確認したら、これらのファイルと`migrateLocalData.ts`ごと削除してよい**
+- `src/db/worker.ts` / `src/db/dbClient.ts` / `src/db/persistence.ts`:以前のsql.js実装。`src/firebase/migrateLocalData.ts`(既存データの一度きりの引き継ぎ)からのみ参照されている。**移行が問題なく完了したことを確認したら、これらのファイルと`migrateLocalData.ts`ごと削除してよい**。**注意**: `package.json`の`sql.js`/`@types/sql.js`はこの`worker.ts`が実際にimportしているため必要。削除前にpackage.jsonから外すとビルドが壊れる(実際に一度このミスでGitHub Actionsのビルドが失敗した)。ファイル削除とセットでpackage.jsonからも外すこと
 - `costco_products_raw.txt`(リポジトリ直下):商品名候補データベース生成時の元データ。生成済みのため参照専用、削除しても支障なし
 
 ### Firebaseプロジェクト情報
