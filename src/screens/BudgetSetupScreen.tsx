@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Loader2, ClipboardList, Plus, X, Check, ChevronDown, Search, Settings } from 'lucide-react'
-import { useCartStore, type Product } from '../store/cartStore'
+import { useCartStore, searchProductCatalog, type Product, type CatalogSuggestion } from '../store/cartStore'
 import { toComparableValue, diffComparableValues } from '../utils/priceCompare'
 import { PriceDiffBadge } from '../components/PriceDiffBadge'
 import { SettingsModal } from './SettingsModal'
@@ -44,6 +44,22 @@ export function BudgetSetupScreen() {
   const [wishlistInput, setWishlistInput] = useState('')
   const [isAddingWishlistItem, setIsAddingWishlistItem] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+
+  // 事前リスト(メモ)の入力中に出す予測変換。商品名候補データベース+
+  // マイ定番棚から検索する(AddProductForm.tsxと同じ仕組み)。
+  // 300ms待ってから検索し、1文字打つたびに検索が走らないようにしている。
+  const [wishlistSuggestions, setWishlistSuggestions] = useState<CatalogSuggestion[]>([])
+  const [isWishlistSuggestionsOpen, setIsWishlistSuggestionsOpen] = useState(false)
+  useEffect(() => {
+    if (wishlistInput.trim().length < 2) {
+      setWishlistSuggestions([])
+      return
+    }
+    const timer = setTimeout(() => {
+      setWishlistSuggestions(searchProductCatalog(wishlistInput, favorites))
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [wishlistInput, favorites])
 
   // 「今回買う予定」のチェック状態。初回に定番棚が読み込まれたタイミングで
   // 全部チェック済みにする(以降はユーザーの操作を優先し、上書きしない)。
@@ -129,6 +145,40 @@ export function BudgetSetupScreen() {
     return categoryNames.map((category) => ({ category, items: groups.get(category)! }))
   }, [visibleFavorites])
 
+  // 事前リストの予測変換もカテゴリ別に見出しを付けて表示する
+  // (件数が多くなりがちな商品名候補データベースの中から探しやすくするため)
+  const groupedWishlistSuggestions = useMemo(() => {
+    const groups = new Map<string, CatalogSuggestion[]>()
+    for (const suggestion of wishlistSuggestions) {
+      const category = suggestion.category ?? OTHER_CATEGORY
+      const list = groups.get(category)
+      if (list) {
+        list.push(suggestion)
+      } else {
+        groups.set(category, [suggestion])
+      }
+    }
+    const categoryNames = [...groups.keys()]
+      .filter((name) => name !== OTHER_CATEGORY)
+      .sort((a, b) => a.localeCompare(b, 'ja'))
+    if (groups.has(OTHER_CATEGORY)) categoryNames.push(OTHER_CATEGORY)
+
+    return categoryNames.map((category) => ({ category, items: groups.get(category)! }))
+  }, [wishlistSuggestions])
+
+  function handleWishlistInputChange(value: string) {
+    setWishlistInput(value)
+    setIsWishlistSuggestionsOpen(true)
+  }
+
+  function handlePickWishlistSuggestion(suggestion: CatalogSuggestion) {
+    // 名前を入力欄に反映するだけ(候補選択=即追加ではない)。店内で
+    // タップした時に商品名が完全一致していれば自動で紐付けられるよう、
+    // 候補と同じ表記に揃えることが主な目的。
+    setWishlistInput(suggestion.name)
+    setIsWishlistSuggestionsOpen(false)
+  }
+
   function selectAll() {
     setCheckedIds(new Set(favorites.map((p) => p.id)))
   }
@@ -173,6 +223,7 @@ export function BudgetSetupScreen() {
   async function handleAddWishlistItem() {
     if (wishlistInput.trim().length === 0) return
     setIsAddingWishlistItem(true)
+    setIsWishlistSuggestionsOpen(false)
     try {
       await addWishlistItem(wishlistInput)
       setWishlistInput('')
@@ -357,20 +408,48 @@ export function BudgetSetupScreen() {
           </p>
 
           <div className="mb-4 flex gap-2">
-            <input
-              type="text"
-              value={wishlistInput}
-              onChange={(e) => setWishlistInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleAddWishlistItem()
-              }}
-              placeholder="例:トイペ"
-              className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-600 focus:outline-none"
-            />
+            <div className="relative flex-1">
+              <input
+                type="text"
+                value={wishlistInput}
+                onChange={(e) => handleWishlistInputChange(e.target.value)}
+                onFocus={() => setIsWishlistSuggestionsOpen(true)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleAddWishlistItem()
+                }}
+                placeholder="例:トイペ"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-600 focus:outline-none"
+              />
+              {isWishlistSuggestionsOpen && groupedWishlistSuggestions.length > 0 && (
+                <div className="absolute z-10 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
+                  {groupedWishlistSuggestions.map(({ category, items }) => (
+                    <div key={category}>
+                      <div className="sticky top-0 border-b border-slate-100 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-500">
+                        {category}
+                      </div>
+                      <ul>
+                        {items.map((item, index) => (
+                          <li key={item.id ?? `catalog-${category}-${index}`}>
+                            <button
+                              type="button"
+                              onClick={() => handlePickWishlistSuggestion(item)}
+                              className="flex w-full items-start gap-2 border-b border-slate-50 px-3 py-2 text-left text-sm last:border-b-0 hover:bg-slate-50"
+                            >
+                              <Search className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-300" />
+                              <span className="flex-1 break-words leading-snug">{item.name}</span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             <button
               onClick={handleAddWishlistItem}
               disabled={isAddingWishlistItem || wishlistInput.trim().length === 0}
-              className="flex items-center justify-center rounded-lg bg-blue-700 px-3 text-white disabled:opacity-40"
+              className="flex shrink-0 items-center justify-center rounded-lg bg-blue-700 px-3 text-white disabled:opacity-40"
             >
               <Plus className="h-5 w-5" />
             </button>
