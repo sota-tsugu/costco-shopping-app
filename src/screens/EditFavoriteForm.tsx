@@ -30,6 +30,7 @@ export function EditFavoriteForm({ product, onClose }: Props) {
   const favorites = useCartStore((state) => state.favorites)
   const updateFavoriteProduct = useCartStore((state) => state.updateFavoriteProduct)
   const removeFavoriteProduct = useCartStore((state) => state.removeFavoriteProduct)
+  const deleteFavoriteProductPermanently = useCartStore((state) => state.deleteFavoriteProductPermanently)
 
   const [name, setName] = useState(product.name)
   const [price, setPrice] = useState(String(product.default_price ?? ''))
@@ -38,6 +39,7 @@ export function EditFavoriteForm({ product, onClose }: Props) {
   const [category, setCategory] = useState(product.category ?? '')
   const [isSaving, setIsSaving] = useState(false)
   const [isRemoving, setIsRemoving] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   // 他の定番棚商品で使われているカテゴリ名を候補として出す
   // (表記ゆれを防ぐため。自由入力も引き続きできる)
@@ -80,6 +82,23 @@ export function EditFavoriteForm({ product, onClose }: Props) {
       onClose()
     } finally {
       setIsRemoving(false)
+    }
+  }
+
+  async function handleDeletePermanently() {
+    const confirmed = window.confirm(
+      `「${product.name}」を完全に削除します。この商品の購入履歴もすべて削除され、元に戻せません。\n\n` +
+        `テストで適当に登録した商品や、誤って会計を完了させてしまった記録を消したい時のための機能です。` +
+        `よく使っている商品を消したい場合は、代わりに「マイ定番棚から外す」をお使いください。\n\n` +
+        `本当に完全に削除しますか?`,
+    )
+    if (!confirmed) return
+    setIsDeleting(true)
+    try {
+      await deleteFavoriteProductPermanently(product.id)
+      onClose()
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -164,11 +183,25 @@ export function EditFavoriteForm({ product, onClose }: Props) {
         <button
           onClick={handleRemove}
           disabled={isRemoving}
-          className="flex w-full items-center justify-center gap-2 rounded-xl border border-red-200 px-4 py-2.5 text-sm font-medium text-red-600 disabled:opacity-50"
+          className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl border border-red-200 px-4 py-2.5 text-sm font-medium text-red-600 disabled:opacity-50"
         >
           {isRemoving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
           マイ定番棚から外す
         </button>
+
+        <div className="border-t border-slate-100 pt-4">
+          <p className="mb-2 text-xs text-slate-400">
+            テスト登録や入力ミスなど、購入履歴ごと完全に無かったことにしたい場合はこちら(元に戻せません)
+          </p>
+          <button
+            onClick={handleDeletePermanently}
+            disabled={isDeleting}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+          >
+            {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+            購入履歴ごと完全に削除する
+          </button>
+        </div>
       </div>
     </div>
   )

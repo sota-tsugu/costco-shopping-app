@@ -122,6 +122,15 @@ type CartState = {
    * 過去の購入履歴が参照する商品情報を失ってしまうため。
    */
   removeFavoriteProduct: (productId: string) => Promise<void>
+  /**
+   * 商品を完全に削除する(ハードデリート)。removeFavoriteProductとは
+   * 違い、商品ドキュメント自体と、その商品にひもづく購入履歴
+   * (Purchase)もまとめて消す。テストで適当に登録してしまった商品や、
+   * 誤って会計を完了させてしまった記録など、「本当に無かったことに
+   * したい」場合向け。元に戻せないため、呼び出し側で確認ダイアログを
+   * 挟むこと。
+   */
+  deleteFavoriteProductPermanently: (productId: string) => Promise<void>
   completeCheckout: () => Promise<void>
   addWishlistItem: (rawName: string) => Promise<void>
   removeWishlistItem: (wishlistId: string) => Promise<void>
@@ -476,6 +485,26 @@ export const useCartStore = create<CartState>((set, get) => ({
     await updateDoc(doc(householdCollection(householdId, 'products'), productId), {
       isFavorite: false,
     })
+  },
+
+  async deleteFavoriteProductPermanently(productId) {
+    const householdId = requireHouseholdId()
+
+    // この商品にひもづく購入履歴(進行中のカート分も含む)をまとめて
+    // 削除する。件数は家庭利用の範囲では少ない(多くても数百件程度)
+    // ため、writeBatch(1回の書き込み上限500件)で十分間に合う想定。
+    const purchasesSnapshot = await getDocs(
+      query(householdCollection(householdId, 'purchases'), where('productId', '==', productId)),
+    )
+    const batch = writeBatch(db)
+    for (const purchaseDoc of purchasesSnapshot.docs) {
+      batch.delete(purchaseDoc.ref)
+    }
+    batch.delete(doc(householdCollection(householdId, 'products'), productId))
+    await batch.commit()
+
+    // 削除した購入履歴を前回価格・購入回数の集計から除くため、取り直す
+    await get().refreshPurchaseSummary()
   },
 
   async completeCheckout() {
