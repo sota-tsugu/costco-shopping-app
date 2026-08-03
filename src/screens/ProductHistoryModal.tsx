@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { X, Loader2, History, Pencil, Check } from 'lucide-react'
+import { X, Loader2, History, Pencil, Check, Trash2 } from 'lucide-react'
 import { collection, query, where, getDocs } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { getSavedHouseholdId } from '../firebase/household'
@@ -13,8 +13,16 @@ import { PriceDiffBadge } from '../components/PriceDiffBadge'
 //
 // 価格比較のロジック(単位あたり単価での比較)は src/utils/priceCompare.ts
 // に共通化している(BudgetSetupScreenの「今回買う予定」リストでも使用)。
+//
+// 【購入記録1件ずつの訂正】各行の鉛筆アイコンから、その場でその1件の
+// 価格・数量・内容量・単位を訂正したり、削除したりできる。以前は
+// 「商品ごと丸ごと削除する」という荒い手段しかなかったが、入力ミスに
+// 気づいた時にその1件だけを直せるようにした(オブジェクト指向UI的な
+// 改善: 購入記録という個々のオブジェクトに対して、直接操作できるように
+// している)。
 
 type PurchaseHistoryRow = {
+  id: string
   created_at: string
   price: number
   quantity: number
@@ -29,12 +37,23 @@ type Props = {
 
 export function ProductHistoryModal({ product, onClose }: Props) {
   const updateProductPrice = useCartStore((state) => state.updateProductPrice)
+  const updatePurchaseRecord = useCartStore((state) => state.updatePurchaseRecord)
+  const deletePurchaseRecord = useCartStore((state) => state.deletePurchaseRecord)
 
   const [rows, setRows] = useState<PurchaseHistoryRow[] | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isEditingPrice, setIsEditingPrice] = useState(false)
   const [priceInput, setPriceInput] = useState(String(product.default_price ?? ''))
   const [isSavingPrice, setIsSavingPrice] = useState(false)
+
+  // 購入履歴の1件を訂正中の状態。editingRowIdがnullなら誰も編集していない
+  const [editingRowId, setEditingRowId] = useState<string | null>(null)
+  const [editPriceInput, setEditPriceInput] = useState('')
+  const [editQuantityInput, setEditQuantityInput] = useState('')
+  const [editAmountInput, setEditAmountInput] = useState('')
+  const [editUnitInput, setEditUnitInput] = useState('')
+  const [isSavingRow, setIsSavingRow] = useState(false)
+  const [isDeletingRow, setIsDeletingRow] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -53,6 +72,7 @@ export function ProductHistoryModal({ product, onClose }: Props) {
         )
         const fetched = snapshot.docs
           .map((d) => ({
+            id: d.id,
             created_at: d.data().createdAt as string,
             price: d.data().price as number,
             quantity: d.data().quantity as number,
@@ -116,6 +136,48 @@ export function ProductHistoryModal({ product, onClose }: Props) {
       setIsEditingPrice(false)
     } finally {
       setIsSavingPrice(false)
+    }
+  }
+
+  function startEditingRow(row: PurchaseHistoryRow) {
+    setEditingRowId(row.id)
+    setEditPriceInput(String(row.price))
+    setEditQuantityInput(String(row.quantity))
+    setEditAmountInput(row.amount !== null ? String(row.amount) : '')
+    setEditUnitInput(row.unit ?? '')
+  }
+
+  async function handleSaveRow(rowId: string) {
+    const price = Number(editPriceInput)
+    const quantity = Number(editQuantityInput)
+    if (!Number.isFinite(price) || price <= 0 || !Number.isFinite(quantity) || quantity <= 0) return
+    setIsSavingRow(true)
+    try {
+      const amountValue = Number(editAmountInput)
+      const updates = {
+        price,
+        quantity,
+        amount: amountValue > 0 ? amountValue : null,
+        unit: editUnitInput.trim() !== '' ? editUnitInput.trim() : null,
+      }
+      await updatePurchaseRecord(rowId, updates)
+      setRows((prev) => (prev ? prev.map((r) => (r.id === rowId ? { ...r, ...updates } : r)) : prev))
+      setEditingRowId(null)
+    } finally {
+      setIsSavingRow(false)
+    }
+  }
+
+  async function handleDeleteRow(rowId: string) {
+    const confirmed = window.confirm('この購入記録を削除しますか?(この1件だけが消え、他の履歴には影響しません)')
+    if (!confirmed) return
+    setIsDeletingRow(true)
+    try {
+      await deletePurchaseRecord(rowId)
+      setRows((prev) => (prev ? prev.filter((r) => r.id !== rowId) : prev))
+      setEditingRowId(null)
+    } finally {
+      setIsDeletingRow(false)
     }
   }
 
@@ -222,29 +284,107 @@ export function ProductHistoryModal({ product, onClose }: Props) {
                 const diffResult = olderRow
                   ? diffComparableValues(rowComparable, toComparableValue(olderRow))
                   : null
+                const isEditingRow = editingRowId === row.id
 
                 return (
                   <li
-                    key={index}
+                    key={row.id}
                     className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
                   >
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-600">
-                        {new Date(row.created_at).toLocaleDateString('ja-JP')}
-                      </span>
-                      <span className="text-slate-800">
-                        ¥{row.price.toLocaleString()} × {row.quantity}
-                      </span>
-                    </div>
-                    {(rowComparable.unitLabel || diffResult) && (
-                      <div className="mt-1 flex items-center justify-end gap-2 text-xs">
-                        {rowComparable.unitLabel && (
-                          <span className="text-costco-blue-600">{formatComparable(rowComparable)}</span>
-                        )}
-                        {diffResult && (
-                          <PriceDiffBadge diff={diffResult.diff} unitLabel={diffResult.unitLabel} />
-                        )}
+                    {isEditingRow ? (
+                      <div>
+                        <div className="mb-2 flex items-center justify-between text-xs text-slate-500">
+                          <span>{new Date(row.created_at).toLocaleDateString('ja-JP')}の記録を訂正</span>
+                          <button onClick={() => setEditingRowId(null)} className="text-slate-400">
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                        <div className="mb-2 flex gap-2">
+                          <div className="flex-1">
+                            <label className="mb-0.5 block text-[10px] text-slate-400">価格(円)</label>
+                            <input
+                              type="number"
+                              inputMode="numeric"
+                              value={editPriceInput}
+                              onChange={(e) => setEditPriceInput(e.target.value)}
+                              className="w-full rounded border border-slate-300 px-2 py-1 text-sm focus:border-costco-blue-500 focus:outline-none"
+                            />
+                          </div>
+                          <div className="w-16">
+                            <label className="mb-0.5 block text-[10px] text-slate-400">数量</label>
+                            <input
+                              type="number"
+                              inputMode="numeric"
+                              value={editQuantityInput}
+                              onChange={(e) => setEditQuantityInput(e.target.value)}
+                              className="w-full rounded border border-slate-300 px-2 py-1 text-sm focus:border-costco-blue-500 focus:outline-none"
+                            />
+                          </div>
+                        </div>
+                        <div className="mb-3 flex gap-2">
+                          <div className="flex-1">
+                            <label className="mb-0.5 block text-[10px] text-slate-400">内容量</label>
+                            <input
+                              type="number"
+                              inputMode="decimal"
+                              value={editAmountInput}
+                              onChange={(e) => setEditAmountInput(e.target.value)}
+                              placeholder="任意"
+                              className="w-full rounded border border-slate-300 px-2 py-1 text-sm focus:border-costco-blue-500 focus:outline-none"
+                            />
+                          </div>
+                          <div className="w-20">
+                            <label className="mb-0.5 block text-[10px] text-slate-400">単位</label>
+                            <input
+                              type="text"
+                              value={editUnitInput}
+                              onChange={(e) => setEditUnitInput(e.target.value)}
+                              placeholder="g等"
+                              className="w-full rounded border border-slate-300 px-2 py-1 text-sm focus:border-costco-blue-500 focus:outline-none"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleSaveRow(row.id)}
+                            disabled={isSavingRow || isDeletingRow}
+                            className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-costco-blue-700 py-1.5 text-xs font-semibold text-white transition-colors active:bg-costco-blue-800 disabled:opacity-50"
+                          >
+                            {isSavingRow ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                            保存
+                          </button>
+                          <button
+                            onClick={() => handleDeleteRow(row.id)}
+                            disabled={isSavingRow || isDeletingRow}
+                            className="flex items-center justify-center gap-1 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 disabled:opacity-50"
+                          >
+                            {isDeletingRow ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                            削除
+                          </button>
+                        </div>
                       </div>
+                    ) : (
+                      <button onClick={() => startEditingRow(row)} className="block w-full text-left">
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-600">
+                            {new Date(row.created_at).toLocaleDateString('ja-JP')}
+                          </span>
+                          <span className="flex items-center gap-1.5 text-slate-800">
+                            ¥{row.price.toLocaleString()} × {row.quantity}
+                            <Pencil className="h-3 w-3 text-slate-300" />
+                          </span>
+                        </div>
+                        {(rowComparable.unitLabel || diffResult) && (
+                          <div className="mt-1 flex items-center justify-end gap-2 text-xs">
+                            {rowComparable.unitLabel && (
+                              <span className="text-costco-blue-600">{formatComparable(rowComparable)}</span>
+                            )}
+                            {diffResult && (
+                              <PriceDiffBadge diff={diffResult.diff} unitLabel={diffResult.unitLabel} />
+                            )}
+                          </div>
+                        )}
+                      </button>
                     )}
                   </li>
                 )

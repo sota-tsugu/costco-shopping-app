@@ -137,6 +137,18 @@ type CartState = {
     matchedCategory?: string | null,
   ) => Promise<Product>
   updateProductPrice: (productId: string, price: number) => Promise<void>
+  /**
+   * 過去の購入記録(Purchase)を1件だけ訂正する。入力ミスに気づいた時に、
+   * その商品を丸ごと削除するのではなく、該当の1件だけを直せるように
+   * するための機能。前回価格・購入回数の集計に影響するため、成功後に
+   * refreshPurchaseSummaryも呼ぶ。
+   */
+  updatePurchaseRecord: (
+    purchaseId: string,
+    updates: { price: number; quantity: number; amount: number | null; unit: string | null },
+  ) => Promise<void>
+  /** 過去の購入記録を1件だけ削除する(商品自体や他の履歴には影響しない) */
+  deletePurchaseRecord: (purchaseId: string) => Promise<void>
   /** マイ定番棚管理画面からの編集。名前・価格・内容量・単位・カテゴリをまとめて更新する */
   updateFavoriteProduct: (
     productId: string,
@@ -524,6 +536,23 @@ export const useCartStore = create<CartState>((set, get) => ({
     await updateDoc(doc(householdCollection(householdId, 'products'), productId), {
       defaultPrice: price,
     })
+  },
+
+  async updatePurchaseRecord(purchaseId, updates) {
+    const householdId = requireHouseholdId()
+    await updateDoc(doc(householdCollection(householdId, 'purchases'), purchaseId), {
+      price: updates.price,
+      quantity: updates.quantity,
+      amount: updates.amount,
+      unit: updates.unit,
+    })
+    await get().refreshPurchaseSummary()
+  },
+
+  async deletePurchaseRecord(purchaseId) {
+    const householdId = requireHouseholdId()
+    await deleteDoc(doc(householdCollection(householdId, 'purchases'), purchaseId))
+    await get().refreshPurchaseSummary()
   },
 
   async updateFavoriteProduct(productId, updates) {
