@@ -20,7 +20,9 @@ export default defineConfig({
       registerType: 'prompt',
       injectRegister: false,
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        // jpgはカート追加アニメーション用の画像(src/assets/cart-icon.jpg)
+        // のためにオフラインキャッシュ対象へ追加した
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg}'],
         // FirebaseのSDK+商品名候補データベースを含むため、通常の上限(2MB)
         // だとオフラインキャッシュの対象から漏れることがあるため広げておく
         maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,

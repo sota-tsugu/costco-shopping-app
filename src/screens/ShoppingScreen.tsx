@@ -15,6 +15,7 @@ import { SettingsModal } from './SettingsModal'
 import { QuickAddModal } from './QuickAddModal'
 import { CartModal } from './CartModal'
 import { TricolorAccent } from '../components/TricolorAccent'
+import cartIconImage from '../assets/cart-icon.jpg'
 
 // 買い物中のメイン画面。
 // UI/UXの4原則(企画書 6章)を意識したレイアウト:
@@ -450,7 +451,12 @@ export function ShoppingScreen() {
           }
           onAnimationEnd={() => removeFlyItem(item.id)}
         >
-          <ShoppingCart className="h-5 w-5 text-white drop-shadow" />
+          {/* カートイメージ画像(SOTAさん提供)を丸い白バッジに乗せて表示。
+              画像自体は白背景のjpgなので、どんな背景色の上でも浮いて
+              見えないよう、あえて白い円で囲んでいる */}
+          <div className="rounded-full bg-white p-1 shadow-md">
+            <img src={cartIconImage} alt="" className="h-6 w-6 object-contain" />
+          </div>
         </div>
       ))}
     </div>
