@@ -13,6 +13,7 @@ import { ProductHistoryModal } from './ProductHistoryModal'
 import { WishlistMatchModal } from './WishlistMatchModal'
 import { SettingsModal } from './SettingsModal'
 import { QuickAddModal } from './QuickAddModal'
+import { CartModal } from './CartModal'
 import { TricolorAccent } from '../components/TricolorAccent'
 
 // 買い物中のメイン画面。
@@ -48,6 +49,7 @@ export function ShoppingScreen() {
   const [prefillNameForNewProduct, setPrefillNameForNewProduct] = useState<string | null>(null)
   const [wishlistIdToResolve, setWishlistIdToResolve] = useState<string | null>(null)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [isCartOpen, setIsCartOpen] = useState(false)
   const [quickAddProduct, setQuickAddProduct] = useState<Product | null>(null)
 
   // 予算を買い物中にその場で直せるようにする(現地で見積もりが変わった
@@ -166,7 +168,19 @@ export function ShoppingScreen() {
       {/* 上部固定:合計金額・予算進捗(視線移動の最小化) */}
       <header className="sticky top-0 z-10 bg-costco-blue-700 px-4 pb-4 pt-4 text-white shadow-md">
         <TricolorAccent />
-        <div className="mb-1 mt-3 flex items-center justify-end">
+        <div className="mb-1 mt-3 flex items-center justify-end gap-1">
+          <button
+            onClick={() => setIsCartOpen(true)}
+            className="relative rounded-full p-1 text-costco-blue-100 transition-colors hover:bg-costco-blue-600"
+            aria-label="カートの中身を見る"
+          >
+            <ShoppingCart className="h-5 w-5" />
+            {cartItemCount > 0 && (
+              <span className="absolute -right-1 -top-1 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-costco-red-600 px-1 text-[10px] font-bold text-white">
+                {cartItemCount}
+              </span>
+            )}
+          </button>
           <button
             onClick={() => setIsSettingsOpen(true)}
             className="rounded-full p-1 text-costco-blue-100 transition-colors hover:bg-costco-blue-600"
@@ -385,6 +399,8 @@ export function ShoppingScreen() {
       {historyProduct && (
         <ProductHistoryModal product={historyProduct} onClose={() => setHistoryProduct(null)} />
       )}
+
+      {isCartOpen && <CartModal onClose={() => setIsCartOpen(false)} />}
 
       {quickAddProduct && (
         <QuickAddModal

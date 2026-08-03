@@ -132,6 +132,8 @@ type CartState = {
    */
   incrementCartQuantity: (productId: string) => void
   decrementFromCart: (productId: string) => void
+  /** カートからその商品を(数量に関わらず)まるごと取り除く */
+  removeCartItem: (productId: string) => void
   addFavoriteProduct: (
     name: string,
     price: number,
@@ -497,6 +499,15 @@ export const useCartStore = create<CartState>((set, get) => ({
     } else {
       void updateDoc(purchaseRef, { quantity: increment(-1) })
     }
+  },
+
+  removeCartItem(productId) {
+    const { cartItems } = get()
+    const existing = cartItems[productId]
+    if (!existing) return
+
+    const householdId = requireHouseholdId()
+    void deleteDoc(doc(householdCollection(householdId, 'purchases'), existing.purchaseId))
   },
 
   async addFavoriteProduct(name, price, amount, unit, matchedProductId = null, matchedCategory = null) {
