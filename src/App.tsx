@@ -1,29 +1,25 @@
-import { useEffect, useState } from 'react'
-import { Loader2, AlertTriangle } from 'lucide-react'
-import { useCartStore } from './store/cartStore'
-import { BudgetSetupScreen } from './screens/BudgetSetupScreen'
-import { ShoppingScreen } from './screens/ShoppingScreen'
+import { useState } from 'react'
+import { Settings } from 'lucide-react'
 import { HouseholdSetupScreen } from './screens/HouseholdSetupScreen'
+import { SettingsModal } from './screens/SettingsModal'
 import { UpdateBanner } from './components/UpdateBanner'
+import { TricolorAccent } from './components/TricolorAccent'
 import { getSavedHouseholdId } from './firebase/household'
 
 // アプリのエントリーポイント。
-// 最初に「家族コード」が端末に保存されているかを確認し、なければ
-// HouseholdSetupScreen(家族を作る/参加する画面)を表示する。
-// 家族コードが決まったら、cartStoreのFirestore購読を開始する。
+//
+// 【白紙化にあたっての注記】STEP0(開発環境の土台)とフェーズ2で作った
+// Firebase基盤(匿名認証+家族コードの仕組み)だけを残し、それ以外の
+// 画面・データの持ち方(マイ定番棚・カート・購入履歴など)は企画を
+// ゼロから見直すため一旦すべて削除した。詳しい経緯はCLAUDE.mdを参照。
+//
+// 家族コードの設定が済んだ後にどんな画面を出すかは、これから改めて
+// 企画・設計していく。今はまだ何もない状態であることが分かる、簡単な
+// プレースホルダー画面だけを表示している。
 
 function App() {
   const [householdReady, setHouseholdReady] = useState(() => getSavedHouseholdId() !== null)
-
-  const screen = useCartStore((state) => state.screen)
-  const errorMessage = useCartStore((state) => state.errorMessage)
-  const init = useCartStore((state) => state.init)
-
-  useEffect(() => {
-    if (householdReady) {
-      init()
-    }
-  }, [householdReady, init])
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
   if (!householdReady) {
     return <HouseholdSetupScreen onReady={() => setHouseholdReady(true)} />
@@ -33,35 +29,32 @@ function App() {
     <>
       {/* 新しいバージョンが公開されたら、画面によらず常に気づけるようにする */}
       <UpdateBanner />
-      {renderScreen()}
+
+      <div className="min-h-screen bg-slate-50">
+        <header className="bg-costco-blue-700 px-4 pb-4 pt-4 text-white shadow-md">
+          <TricolorAccent />
+          <div className="mt-3 flex items-center justify-between">
+            <h1 className="text-base font-semibold">我が家専用コストコ買い物リスト</h1>
+            <button
+              onClick={() => setIsSettingsOpen(true)}
+              className="rounded-full p-1 text-costco-blue-100 transition-colors hover:bg-costco-blue-600"
+              aria-label="設定"
+            >
+              <Settings className="h-5 w-5" />
+            </button>
+          </div>
+        </header>
+
+        <main className="mx-auto max-w-md px-6 py-10 text-center">
+          <p className="text-sm text-slate-500">
+            画面はまだありません。これから企画・設計をゼロから見直していきます。
+          </p>
+        </main>
+      </div>
+
+      {isSettingsOpen && <SettingsModal onClose={() => setIsSettingsOpen(false)} />}
     </>
   )
-
-  function renderScreen() {
-    if (errorMessage) {
-      return (
-        <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-slate-50 px-6 text-center">
-          <AlertTriangle className="h-8 w-8 text-red-500" />
-          <p className="text-sm text-red-600">エラーが発生しました: {errorMessage}</p>
-        </div>
-      )
-    }
-
-    if (screen === 'loading') {
-      return (
-        <div className="flex min-h-screen items-center justify-center gap-2 bg-slate-50 text-slate-500">
-          <Loader2 className="h-5 w-5 animate-spin text-costco-blue-600" />
-          <span>読み込んでいます…</span>
-        </div>
-      )
-    }
-
-    if (screen === 'budget-setup') {
-      return <BudgetSetupScreen />
-    }
-
-    return <ShoppingScreen />
-  }
 }
 
 export default App

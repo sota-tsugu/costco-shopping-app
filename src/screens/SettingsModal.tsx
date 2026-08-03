@@ -94,7 +94,7 @@ export function SettingsModal({ onClose }: Props) {
             画面がおかしい・新しい機能が出てこない、という時はこちらをお試しください。
           </p>
           <p className="mb-3 text-xs text-slate-400">
-            マイ定番棚や購入履歴などのデータは別の場所に保存されているため、更新しても消えません。
+            Firestore(クラウド)に保存されているデータは別の場所にあるため、更新しても消えません。
           </p>
           <button
             onClick={handleUpdate}

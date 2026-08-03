@@ -1,15 +1,17 @@
 import { useState } from 'react'
 import { Users, Loader2, Copy, Check } from 'lucide-react'
 import { createNewHousehold, joinHousehold } from '../firebase/household'
-import { migrateLocalDataToHousehold } from '../firebase/migrateLocalData'
 import { TricolorAccent } from '../components/TricolorAccent'
 
 // アプリを初めて開いた端末で表示される、家族コードの設定画面。
 // 「新しい家族を作る」か「既にある家族コードで参加する」かを選ぶ。
 //
-// 新しく家族を作った場合は、この端末に残っている今までのテストデータ
-// (マイ定番棚・購入履歴など)を一度だけFirestoreに引き継ぐ処理を行う
-// (src/firebase/migrateLocalData.ts)。
+// 【白紙化にあたっての注記】以前はここで、この端末に残っていた旧
+// sql.js版のテストデータ(マイ定番棚・購入履歴など)をFirestoreへ
+// 一度だけ引き継ぐ処理(migrateLocalDataToHousehold)を呼んでいたが、
+// アプリの企画をゼロから見直すにあたり、旧データモデルごと削除した
+// ため不要になった。household(家族コード)関連の土台自体は今後も
+// 使う想定のため、この画面はそのまま残している。
 
 type Props = {
   onReady: () => void
@@ -32,13 +34,6 @@ export function HouseholdSetupScreen({ onReady }: Props) {
       const code = await createNewHousehold()
       setNewCode(code)
       setMode('created')
-      // 今までこの端末にあったテストデータを引き継ぐ(失敗しても致命的では
-      // ないので、エラーがあってもここでは止めない)
-      try {
-        await migrateLocalDataToHousehold(code)
-      } catch (migrationError) {
-        console.error('既存データの引き継ぎに失敗しました', migrationError)
-      }
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : String(error))
     } finally {
