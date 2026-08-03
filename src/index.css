@@ -1,3 +1,52 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+ * カートに商品を追加した時の演出(軽量版)。
+ * タップした位置から合計金額の表示に向かって小さいアイコンが飛んでいき、
+ * 合計金額の数字がポンと弾む。CSSのkeyframesだけで作っているので、
+ * 追加のライブラリは不要(無料運用の方針に沿う)。
+ * 開始位置(--start-x/--start-y)と移動量(--dx/--dy)はJS側で
+ * 計算してインラインstyleとして渡している(src/screens/ShoppingScreen.tsx)。
+ */
+@keyframes fly-to-cart {
+  0% {
+    /* -50%/-50%は要素自身の幅・高さの半分だけずらして、
+       start-x/start-y(タップ位置の中心)に中心を合わせるための調整 */
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0.3);
+    opacity: 0;
+  }
+}
+
+.fly-to-cart {
+  position: fixed;
+  left: var(--start-x);
+  top: var(--start-y);
+  pointer-events: none;
+  z-index: 60;
+  animation: fly-to-cart 0.5s ease-in forwards;
+}
+
+@keyframes total-pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.total-pop {
+  animation: total-pop 0.35s ease-out;
+}

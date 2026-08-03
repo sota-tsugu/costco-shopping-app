@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Plus, Minus, PlusCircle, CheckCircle2, ClipboardList, Settings, Pencil } from 'lucide-react'
+import { useRef, useState, type CSSProperties } from 'react'
+import { Plus, Minus, PlusCircle, CheckCircle2, ClipboardList, Settings, Pencil, ShoppingCart } from 'lucide-react'
 import {
   useCartStore,
   calcTotal,
@@ -49,25 +49,56 @@ export function ShoppingScreen() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [quickAddProduct, setQuickAddProduct] = useState<Product | null>(null)
 
+  // 「カートに入った」感を出す軽い演出。新しく商品をカートに追加した
+  // 瞬間(タップ一発の追加、事前リストからの追加)だけ、タップした位置から
+  // 合計金額に向かって小さいアイコンが飛んでいき、金額がポンと弾む。
+  // 既にカートにある商品の数量を+1する操作(何十回もタップし得る)では
+  // 出さないようにし、演出がしつこく感じられないようにしている。
+  // CSSアニメーションの中身はsrc/index.cssを参照。
+  const totalRef = useRef<HTMLSpanElement>(null)
+  const [flyItems, setFlyItems] = useState<
+    { id: number; startX: number; startY: number; dx: number; dy: number }[]
+  >([])
+  const [totalPopKey, setTotalPopKey] = useState(0)
+
+  function triggerCartFlyAnimation(startEl: HTMLElement) {
+    const totalEl = totalRef.current
+    if (!totalEl) return
+    const startRect = startEl.getBoundingClientRect()
+    const endRect = totalEl.getBoundingClientRect()
+    const startX = startRect.left + startRect.width / 2
+    const startY = startRect.top + startRect.height / 2
+    const dx = endRect.left + endRect.width / 2 - startX
+    const dy = endRect.top + endRect.height / 2 - startY
+    const id = Date.now() + Math.random()
+    setFlyItems((prev) => [...prev, { id, startX, startY, dx, dy }])
+    setTotalPopKey((k) => k + 1)
+  }
+
+  function removeFlyItem(id: number) {
+    setFlyItems((prev) => prev.filter((item) => item.id !== id))
+  }
+
   const total = calcTotal(cartItems)
   const progressRatio = budget > 0 ? Math.min(total / budget, 1) : 0
   const isOverBudget = total > budget
   const cartItemCount = Object.values(cartItems).reduce((sum, item) => sum + item.quantity, 0)
 
   /** 前回(なければ登録時)の価格・内容量・単位のまま、ワンタップでカートに追加する */
-  function handleFastAdd(product: Product) {
+  function handleFastAdd(product: Product, startEl?: HTMLElement) {
     const suggested = getSuggestedCartDetails(product, purchaseSummaryByProduct[product.id])
     addToCartWithDetails(product, { ...suggested, quantity: 1 })
+    if (startEl) triggerCartFlyAnimation(startEl)
   }
 
-  function handleWishlistTap(item: WishlistItem) {
+  function handleWishlistTap(item: WishlistItem, startEl: HTMLElement) {
     // 「トイペ」のような自由入力の名前と、定番棚の商品名が完全一致すれば
     // 自動で紐付けてカートに追加する。一致しなければ選択画面を開く。
     const normalizedRawName = item.raw_name.trim().toLowerCase()
     const matched = favorites.find((p) => p.name.trim().toLowerCase() === normalizedRawName)
 
     if (matched) {
-      handleFastAdd(matched)
+      handleFastAdd(matched, startEl)
       void removeWishlistItem(item.id)
     } else {
       setMatchingWishlistItem(item)
@@ -128,7 +159,9 @@ export function ShoppingScreen() {
         </div>
         <div className="flex items-end justify-between">
           <span className="text-sm text-costco-blue-100">合計金額</span>
-          <span className="text-3xl font-semibold tracking-tight">¥{total.toLocaleString()}</span>
+          <span key={totalPopKey} ref={totalRef} className="total-pop text-3xl font-semibold tracking-tight">
+            ¥{total.toLocaleString()}
+          </span>
         </div>
 
         <div className="mt-3">
@@ -162,7 +195,7 @@ export function ShoppingScreen() {
                   className="flex items-center gap-2 rounded-xl bg-white p-3 shadow-sm"
                 >
                   <button
-                    onClick={() => handleWishlistTap(item)}
+                    onClick={(e) => handleWishlistTap(item, e.currentTarget)}
                     className="flex flex-1 items-center gap-2 text-left text-sm font-medium text-slate-800"
                   >
                     <Plus className="h-4 w-4 shrink-0 text-costco-red-600" />
@@ -240,7 +273,7 @@ export function ShoppingScreen() {
                 {quantity === 0 ? (
                   <div className="mt-auto flex gap-1.5">
                     <button
-                      onClick={() => handleFastAdd(product)}
+                      onClick={(e) => handleFastAdd(product, e.currentTarget)}
                       className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-costco-red-600 py-2 text-sm font-semibold text-white transition-colors active:bg-costco-red-700"
                     >
                       <Plus className="h-4 w-4" />
@@ -343,6 +376,25 @@ export function ShoppingScreen() {
       )}
 
       {isSettingsOpen && <SettingsModal onClose={() => setIsSettingsOpen(false)} />}
+
+      {/* カート追加の演出用アイコン(見た目のみ・操作には反応しない) */}
+      {flyItems.map((item) => (
+        <div
+          key={item.id}
+          className="fly-to-cart"
+          style={
+            {
+              '--start-x': `${item.startX}px`,
+              '--start-y': `${item.startY}px`,
+              '--dx': `${item.dx}px`,
+              '--dy': `${item.dy}px`,
+            } as CSSProperties
+          }
+          onAnimationEnd={() => removeFlyItem(item.id)}
+        >
+          <ShoppingCart className="h-5 w-5 text-white drop-shadow" />
+        </div>
+      ))}
     </div>
   )
 }
