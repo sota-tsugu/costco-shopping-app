@@ -1,5 +1,5 @@
 import { useRef, useState, type CSSProperties } from 'react'
-import { Plus, Minus, PlusCircle, CheckCircle2, ClipboardList, Settings, Pencil, ShoppingCart } from 'lucide-react'
+import { Plus, Minus, PlusCircle, CheckCircle2, Check, ClipboardList, Settings, Pencil, ShoppingCart } from 'lucide-react'
 import {
   useCartStore,
   calcTotal,
@@ -39,6 +39,7 @@ export function ShoppingScreen() {
   const addFavoriteProduct = useCartStore((state) => state.addFavoriteProduct)
   const completeCheckout = useCartStore((state) => state.completeCheckout)
   const removeWishlistItem = useCartStore((state) => state.removeWishlistItem)
+  const updateBudget = useCartStore((state) => state.updateBudget)
 
   const [isAddFormOpen, setIsAddFormOpen] = useState(false)
   const [isCheckingOut, setIsCheckingOut] = useState(false)
@@ -48,6 +49,23 @@ export function ShoppingScreen() {
   const [wishlistIdToResolve, setWishlistIdToResolve] = useState<string | null>(null)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [quickAddProduct, setQuickAddProduct] = useState<Product | null>(null)
+
+  // 予算を買い物中にその場で直せるようにする(現地で見積もりが変わった
+  // 時に、買い物前の画面まで戻らなくても直接書き換えられるようにする)
+  const [isEditingBudget, setIsEditingBudget] = useState(false)
+  const [budgetInput, setBudgetInput] = useState('')
+
+  function startEditingBudget() {
+    setBudgetInput(String(budget))
+    setIsEditingBudget(true)
+  }
+
+  async function handleSaveBudget() {
+    const newBudget = Number(budgetInput)
+    if (!Number.isFinite(newBudget) || newBudget <= 0) return
+    await updateBudget(newBudget)
+    setIsEditingBudget(false)
+  }
 
   // 「カートに入った」感を出す軽い演出。新しく商品をカートに追加した
   // 瞬間(タップ一発の追加、事前リストからの追加)だけ、タップした位置から
@@ -173,8 +191,32 @@ export function ShoppingScreen() {
               style={{ width: `${progressRatio * 100}%` }}
             />
           </div>
-          <div className="mt-1 flex justify-between text-xs text-costco-blue-100">
-            <span>予算 ¥{budget.toLocaleString()}</span>
+          <div className="mt-1 flex items-center justify-between text-xs text-costco-blue-100">
+            {isEditingBudget ? (
+              <span className="flex items-center gap-1">
+                予算 ¥
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  autoFocus
+                  value={budgetInput}
+                  onChange={(e) => setBudgetInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSaveBudget()
+                    if (e.key === 'Escape') setIsEditingBudget(false)
+                  }}
+                  className="w-16 border-b border-white bg-transparent text-white focus:outline-none"
+                />
+                <button onClick={handleSaveBudget} className="ml-1 rounded bg-white/20 px-1.5 py-0.5">
+                  <Check className="h-3 w-3" />
+                </button>
+              </span>
+            ) : (
+              <button onClick={startEditingBudget} className="flex items-center gap-1">
+                予算 ¥{budget.toLocaleString()}
+                <Pencil className="h-3 w-3 text-costco-blue-200" />
+              </button>
+            )}
             {isOverBudget && <span className="font-semibold text-costco-red-200">予算オーバー</span>}
           </div>
         </div>

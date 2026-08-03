@@ -6,6 +6,7 @@ import {
   getSuggestedCartDetails,
   type Product,
   type CatalogSuggestion,
+  type WishlistItem,
 } from '../store/cartStore'
 import { SettingsModal } from './SettingsModal'
 import { ManageFavoritesModal } from './ManageFavoritesModal'
@@ -41,6 +42,7 @@ export function BudgetSetupScreen() {
   const favorites = useCartStore((state) => state.favorites)
   const wishlist = useCartStore((state) => state.wishlist)
   const addWishlistItem = useCartStore((state) => state.addWishlistItem)
+  const updateWishlistItem = useCartStore((state) => state.updateWishlistItem)
   const removeWishlistItem = useCartStore((state) => state.removeWishlistItem)
   const purchaseSummaryByProduct = useCartStore((state) => state.purchaseSummaryByProduct)
 
@@ -50,6 +52,11 @@ export function BudgetSetupScreen() {
   const [isAddingWishlistItem, setIsAddingWishlistItem] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isManageFavoritesOpen, setIsManageFavoritesOpen] = useState(false)
+
+  // 事前リストのメモを打ち間違えた時に、削除して入力し直さずその場で
+  // 直せるようにするための編集状態(タップするとテキスト欄に切り替わる)
+  const [editingWishlistId, setEditingWishlistId] = useState<string | null>(null)
+  const [editWishlistNameInput, setEditWishlistNameInput] = useState('')
 
   // 事前リスト(メモ)の入力中に出す予測変換。商品名候補データベース+
   // マイ定番棚から検索する(AddProductForm.tsxと同じ仕組み)。
@@ -220,6 +227,17 @@ export function BudgetSetupScreen() {
     } finally {
       setIsAddingWishlistItem(false)
     }
+  }
+
+  function startEditingWishlistItem(item: WishlistItem) {
+    setEditingWishlistId(item.id)
+    setEditWishlistNameInput(item.raw_name)
+  }
+
+  async function handleSaveWishlistItem(wishlistId: string) {
+    if (editWishlistNameInput.trim().length === 0) return
+    await updateWishlistItem(wishlistId, editWishlistNameInput)
+    setEditingWishlistId(null)
   }
 
   return (
@@ -466,21 +484,59 @@ export function BudgetSetupScreen() {
             <p className="text-xs text-slate-400">まだメモがありません</p>
           ) : (
             <ul className="space-y-2">
-              {wishlist.map((item) => (
-                <li
-                  key={item.id}
-                  className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm"
-                >
-                  <span className="text-slate-700">{item.raw_name}</span>
-                  <button
-                    onClick={() => removeWishlistItem(item.id)}
-                    className="text-slate-300"
-                    aria-label="削除"
+              {wishlist.map((item) =>
+                editingWishlistId === item.id ? (
+                  <li
+                    key={item.id}
+                    className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm"
                   >
-                    <X className="h-4 w-4" />
-                  </button>
-                </li>
-              ))}
+                    <input
+                      type="text"
+                      autoFocus
+                      value={editWishlistNameInput}
+                      onChange={(e) => setEditWishlistNameInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleSaveWishlistItem(item.id)
+                        if (e.key === 'Escape') setEditingWishlistId(null)
+                      }}
+                      className="min-w-0 flex-1 rounded border border-costco-blue-300 bg-white px-2 py-1 focus:border-costco-blue-500 focus:outline-none"
+                    />
+                    <button
+                      onClick={() => handleSaveWishlistItem(item.id)}
+                      className="shrink-0 rounded-lg bg-costco-blue-700 p-1.5 text-white"
+                      aria-label="保存"
+                    >
+                      <Check className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => setEditingWishlistId(null)}
+                      className="shrink-0 text-slate-300"
+                      aria-label="キャンセル"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </li>
+                ) : (
+                  <li
+                    key={item.id}
+                    className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm"
+                  >
+                    <button
+                      onClick={() => startEditingWishlistItem(item)}
+                      className="min-w-0 flex-1 truncate text-left text-slate-700"
+                    >
+                      {item.raw_name}
+                    </button>
+                    <button
+                      onClick={() => removeWishlistItem(item.id)}
+                      className="ml-2 shrink-0 text-slate-300"
+                      aria-label="削除"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </li>
+                ),
+              )}
             </ul>
           )}
         </div>

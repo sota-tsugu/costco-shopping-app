@@ -111,6 +111,12 @@ type CartState = {
    */
   startTrip: (budget: number, plannedProductIds: string[]) => Promise<void>
   /**
+   * 買い物中に予算を直接書き換える。買い物前の画面で1回設定したら
+   * 固定、ではなく、現地で見積もりが変わった時にその場で直せるように
+   * している(予算という値そのものに対する直接操作)。
+   */
+  updateBudget: (budget: number) => Promise<void>
+  /**
    * 今回の価格・内容量・単位・数量を指定してカートに追加する(新規追加)。
    * 前回購入時の値をそのまま使う「ワンタップ追加」も、値を編集してから
    * 追加する場合も、どちらもこの関数を通る。
@@ -172,6 +178,8 @@ type CartState = {
   deleteFavoriteProductPermanently: (productId: string) => Promise<void>
   completeCheckout: () => Promise<void>
   addWishlistItem: (rawName: string) => Promise<void>
+  /** 事前リストのメモの表記を直接書き換える(打ち間違えた時に削除→再登録せずに直せる) */
+  updateWishlistItem: (wishlistId: string, rawName: string) => Promise<void>
   removeWishlistItem: (wishlistId: string) => Promise<void>
   /** 会計完了後などに、前回価格・購入回数の集計をFirestoreから取り直す */
   refreshPurchaseSummary: () => Promise<void>
@@ -432,6 +440,14 @@ export const useCartStore = create<CartState>((set, get) => ({
     // 実際の画面切り替えはshoppingTripsのonSnapshotで自動的に行われる
   },
 
+  async updateBudget(budget) {
+    const { tripId } = get()
+    if (tripId === null) return
+    const householdId = requireHouseholdId()
+    await updateDoc(doc(householdCollection(householdId, 'shoppingTrips'), tripId), { budget })
+    // 画面表示への反映はshoppingTripsのonSnapshotで自動的に行われる
+  },
+
   addToCartWithDetails(product, details) {
     const { tripId } = get()
     if (tripId === null || details.quantity <= 0) return
@@ -625,6 +641,15 @@ export const useCartStore = create<CartState>((set, get) => ({
       rawName: trimmed,
       productId: null,
       createdAt: new Date().toISOString(),
+    })
+  },
+
+  async updateWishlistItem(wishlistId, rawName) {
+    const trimmed = rawName.trim()
+    if (trimmed.length === 0) return
+    const householdId = requireHouseholdId()
+    await updateDoc(doc(householdCollection(householdId, 'wishlist'), wishlistId), {
+      rawName: trimmed,
     })
   },
 
