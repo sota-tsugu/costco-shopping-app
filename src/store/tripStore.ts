@@ -410,3 +410,37 @@ export async function fetchLatestPurchaseByProduct(
     .sort((a, b) => (a.addedToCartAt > b.addedToCartAt ? -1 : 1))
   return rows[0] ?? null
 }
+
+/**
+ * 直近に完了した買い物トリップで、実際に購入済みだった商品のidをまとめて
+ * 取得する。「前回買ったものを反映」ボタンから使う。
+ *
+ * Firestoreの複合インデックス(status==completedで絞り込みつつ
+ * completedAtで並べ替える、という組み合わせ)を新たに作らずに済むよう、
+ * 完了済みトリップは一旦まとめて取得してからJavaScript側で最新のものを
+ * 選んでいる(家庭利用の範囲では件数が少ないため、パフォーマンス上の
+ * 問題にはならない想定)。
+ */
+export async function fetchLastCompletedTripProductIds(): Promise<string[]> {
+  const householdId = requireHouseholdId()
+  const tripsSnapshot = await getDocs(
+    query(householdCollection(householdId, 'shoppingTrips'), where('status', '==', 'completed')),
+  )
+  const trips = tripsSnapshot.docs
+    .map((d) => ({ id: d.id, completedAt: (d.data().completedAt ?? '') as string }))
+    .sort((a, b) => (a.completedAt > b.completedAt ? -1 : 1))
+  const lastTrip = trips[0]
+  if (!lastTrip) return []
+
+  const itemsSnapshot = await getDocs(
+    query(
+      householdCollection(householdId, 'tripItems'),
+      where('tripId', '==', lastTrip.id),
+      where('status', '==', 'purchased'),
+    ),
+  )
+  const productIds = itemsSnapshot.docs
+    .map((d) => d.data().productId as string | null)
+    .filter((id): id is string => id !== null)
+  return [...new Set(productIds)]
+}

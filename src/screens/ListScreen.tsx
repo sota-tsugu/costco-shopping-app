@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Check, ChevronRight, Settings, ShoppingCart, X, Search, Minus, Trash2, Pencil } from 'lucide-react'
-import { useTripStore, type Product, type TripItem } from '../store/tripStore'
+import { Plus, Check, ChevronRight, Settings, ShoppingCart, X, Search, Minus, Trash2, Pencil, History } from 'lucide-react'
+import { useTripStore, fetchLastCompletedTripProductIds, type Product, type TripItem } from '../store/tripStore'
 import { SettingsModal } from './SettingsModal'
 import { TricolorAccent } from '../components/TricolorAccent'
 import { PRODUCT_CATALOG } from '../data/productCatalog'
@@ -41,6 +41,7 @@ export function ListScreen({ onOpenCart }: Props) {
   const [isAddProductOpen, setIsAddProductOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [budgetInput, setBudgetInput] = useState('30000')
+  const [isApplyingLastTrip, setIsApplyingLastTrip] = useState(false)
 
   // トリップが無ければ、初期予算3万円でplanningトリップを自動的に作る
   // (以前のアプリと同様、毎回同じようなものを買う前提で「まず一覧が
@@ -121,6 +122,27 @@ export function ListScreen({ onOpenCart }: Props) {
     await startShopping()
   }
 
+  // 「前回買ったものを反映」:直近に完了した買い物トリップで実際に
+  // 購入済みだった商品を、今回のリストにチェックとして追加する。
+  // 今チェックしている他の商品を消してしまわないよう、上書きではなく
+  // 追加の扱いにしている(すでにチェック済みの商品はそのまま)
+  async function handleApplyLastTrip() {
+    setIsApplyingLastTrip(true)
+    try {
+      const productIds = await fetchLastCompletedTripProductIds()
+      if (productIds.length === 0) {
+        window.alert('前回の買い物履歴がまだありません。')
+        return
+      }
+      const targets = products.filter((p) => productIds.includes(p.id) && !isChecked(p.id))
+      for (const product of targets) {
+        await togglePlannedProduct(product, true)
+      }
+    } finally {
+      setIsApplyingLastTrip(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 pb-8">
       <header className="bg-costco-blue-700 px-4 pb-4 pt-4 text-white shadow-md">
@@ -174,6 +196,17 @@ export function ListScreen({ onOpenCart }: Props) {
       </header>
 
       <main className="mx-auto max-w-md px-4 py-4">
+        {isPlanning && products.length > 0 && (
+          <button
+            onClick={handleApplyLastTrip}
+            disabled={isApplyingLastTrip}
+            className="mb-4 flex w-full items-center justify-center gap-1.5 rounded-xl border border-costco-blue-200 bg-white py-2.5 text-sm font-medium text-costco-blue-700 shadow-sm disabled:opacity-50"
+          >
+            <History className="h-4 w-4" />
+            {isApplyingLastTrip ? '反映しています…' : '前回買ったものを反映'}
+          </button>
+        )}
+
         {products.length === 0 && (
           <p className="mb-4 rounded-xl bg-white p-4 text-sm text-slate-400 shadow-sm">
             まだ定番商品が登録されていません。下の「商品を登録」から追加してください。
