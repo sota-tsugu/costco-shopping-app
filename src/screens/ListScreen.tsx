@@ -121,9 +121,7 @@ export function ListScreen({ onOpenCart }: Props) {
       <header className="bg-costco-blue-700 px-4 pb-4 pt-4 text-white shadow-md">
         <TricolorAccent />
         <div className="mt-3 flex items-center justify-between">
-          <h1 className="text-base font-semibold">
-            {isActive ? '今回買うものリスト' : '今回買う予定を決める'}
-          </h1>
+          <h1 className="text-base font-semibold">今回買うものリスト</h1>
           <button
             onClick={() => setIsSettingsOpen(true)}
             className="rounded-full p-1 text-costco-blue-100 transition-colors hover:bg-costco-blue-600"
