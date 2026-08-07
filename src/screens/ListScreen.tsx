@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Check, ChevronRight, Settings, ShoppingCart, X, Search } from 'lucide-react'
+import { Plus, Check, ChevronRight, Settings, ShoppingCart, X, Search, Minus, Trash2, Pencil } from 'lucide-react'
 import { useTripStore, type Product, type TripItem } from '../store/tripStore'
 import { SettingsModal } from './SettingsModal'
 import { TricolorAccent } from '../components/TricolorAccent'
@@ -32,9 +32,14 @@ export function ListScreen({ onOpenCart }: Props) {
   const togglePlannedProduct = useTripStore((state) => state.togglePlannedProduct)
   const startShopping = useTripStore((state) => state.startShopping)
   const addToCart = useTripStore((state) => state.addToCart)
+  const updateProduct = useTripStore((state) => state.updateProduct)
+  const removeProduct = useTripStore((state) => state.removeProduct)
+  const updateCartItemQuantity = useTripStore((state) => state.updateCartItemQuantity)
+  const removeTripItem = useTripStore((state) => state.removeTripItem)
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isAddProductOpen, setIsAddProductOpen] = useState(false)
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [budgetInput, setBudgetInput] = useState('30000')
 
   // トリップが無ければ、初期予算3万円でplanningトリップを自動的に作る
@@ -183,29 +188,35 @@ export function ListScreen({ onOpenCart }: Props) {
                 {items.map((product) => {
                   const checked = isChecked(product.id)
                   return (
-                    <li key={product.id}>
+                    <li
+                      key={product.id}
+                      className="flex items-center gap-2 rounded-xl bg-white px-3 py-2.5 shadow-sm"
+                    >
                       <button
                         onClick={() => handleToggle(product)}
-                        className="flex w-full items-center gap-2 rounded-xl bg-white px-3 py-2.5 text-left shadow-sm"
+                        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 ${
+                          checked ? 'border-costco-red-600 bg-costco-red-600' : 'border-slate-300'
+                        }`}
+                        aria-label="今回買うものリストに入れる/外す"
+                      >
+                        {checked && <Check className="h-3.5 w-3.5 text-white" />}
+                      </button>
+                      <button
+                        onClick={() => setEditingProduct(product)}
+                        className="flex min-w-0 flex-1 items-center gap-1 text-left text-sm"
                       >
                         <span
-                          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 ${
-                            checked ? 'border-costco-red-600 bg-costco-red-600' : 'border-slate-300'
-                          }`}
-                        >
-                          {checked && <Check className="h-3.5 w-3.5 text-white" />}
-                        </span>
-                        <span
-                          className={`min-w-0 flex-1 truncate text-sm ${
+                          className={`truncate underline decoration-slate-300 underline-offset-2 ${
                             checked ? 'text-slate-800' : 'text-slate-400 line-through'
                           }`}
                         >
                           {product.name}
                         </span>
-                        <span className="shrink-0 text-xs text-slate-400">
-                          ¥{(product.defaultPrice ?? 0).toLocaleString()}
-                        </span>
+                        <Pencil className="h-3 w-3 shrink-0 text-slate-300" />
                       </button>
+                      <span className="shrink-0 text-xs text-slate-400">
+                        ¥{(product.defaultPrice ?? 0).toLocaleString()}
+                      </span>
                     </li>
                   )
                 })}
@@ -236,17 +247,52 @@ export function ListScreen({ onOpenCart }: Props) {
                       </span>
                     </div>
                     {item.status === 'considering' ? (
-                      <button
-                        onClick={() => addToCart(item.id)}
-                        className="flex shrink-0 items-center gap-1 rounded-lg bg-costco-red-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors active:bg-costco-red-700"
-                      >
-                        <Plus className="h-3.5 w-3.5" />
-                        カートに入れる
-                      </button>
+                      <>
+                        <button
+                          onClick={() => addToCart(item.id)}
+                          className="flex shrink-0 items-center gap-1 rounded-lg bg-costco-red-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors active:bg-costco-red-700"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                          カートに入れる
+                        </button>
+                        <button
+                          onClick={() => removeTripItem(item.id)}
+                          className="shrink-0 p-1 text-slate-300 active:text-red-500"
+                          aria-label="今回買うものリストから外す"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </>
                     ) : (
-                      <span className="shrink-0 text-xs text-slate-400">
-                        ¥{((item.price ?? 0) * item.quantity).toLocaleString()}
-                      </span>
+                      <>
+                        <div className="flex shrink-0 items-center gap-1 rounded-lg bg-slate-100 p-0.5">
+                          <button
+                            onClick={() => updateCartItemQuantity(item.id, item.quantity - 1)}
+                            className="rounded bg-white p-1 shadow-sm active:bg-slate-200"
+                            aria-label="数量を減らす"
+                          >
+                            <Minus className="h-3.5 w-3.5 text-slate-700" />
+                          </button>
+                          <span className="w-5 text-center text-xs font-bold text-slate-800">{item.quantity}</span>
+                          <button
+                            onClick={() => updateCartItemQuantity(item.id, item.quantity + 1)}
+                            className="rounded bg-white p-1 shadow-sm active:bg-slate-200"
+                            aria-label="数量を増やす"
+                          >
+                            <Plus className="h-3.5 w-3.5 text-slate-700" />
+                          </button>
+                        </div>
+                        <span className="shrink-0 text-xs text-slate-400">
+                          ¥{((item.price ?? 0) * item.quantity).toLocaleString()}
+                        </span>
+                        <button
+                          onClick={() => removeTripItem(item.id)}
+                          className="shrink-0 p-1 text-slate-300 active:text-red-500"
+                          aria-label="カートから外す"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </>
                     )}
                   </li>
                 ))}
@@ -285,6 +331,22 @@ export function ListScreen({ onOpenCart }: Props) {
             // なってしまうのを防ぐため
             await togglePlannedProduct(newProduct, true)
             setIsAddProductOpen(false)
+          }}
+        />
+      )}
+
+      {editingProduct && (
+        <EditProductSheet
+          product={editingProduct}
+          existingProducts={products}
+          onClose={() => setEditingProduct(null)}
+          onSubmit={async (name, category, price, amount, unit) => {
+            await updateProduct(editingProduct.id, { name, category, price, amount, unit })
+            setEditingProduct(null)
+          }}
+          onDelete={async () => {
+            await removeProduct(editingProduct.id)
+            setEditingProduct(null)
           }}
         />
       )}
@@ -450,6 +512,152 @@ function AddProductSheet({ existingProducts, onClose, onSubmit }: AddProductShee
           className="flex w-full items-center justify-center gap-2 rounded-xl bg-costco-red-600 px-4 py-3 font-semibold text-white shadow transition-colors active:bg-costco-red-700 disabled:opacity-50"
         >
           登録する
+        </button>
+      </div>
+    </div>
+  )
+}
+
+type EditProductSheetProps = {
+  product: Product
+  existingProducts: Product[]
+  onClose: () => void
+  onSubmit: (
+    name: string,
+    category: string | null,
+    price: number | null,
+    amount: number | null,
+    unit: string | null,
+  ) => Promise<void>
+  onDelete: () => Promise<void>
+}
+
+/** 定番商品リストの1件を編集・削除するシート。AddProductSheetと似た作りだが、
+ * 値がすでに入っている状態で開き、削除ボタンも持つ */
+function EditProductSheet({ product, existingProducts, onClose, onSubmit, onDelete }: EditProductSheetProps) {
+  const [name, setName] = useState(product.name)
+  const [category, setCategory] = useState(product.category ?? '')
+  const [price, setPrice] = useState(product.defaultPrice !== null ? String(product.defaultPrice) : '')
+  const [amount, setAmount] = useState(product.defaultAmount !== null ? String(product.defaultAmount) : '')
+  const [unit, setUnit] = useState(product.defaultUnit ?? '')
+  const [isSaving, setIsSaving] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  const categoryOptions = useMemo(() => {
+    const set = new Set<string>()
+    for (const p of existingProducts) {
+      if (p.category) set.add(p.category)
+    }
+    return [...set].sort((a, b) => a.localeCompare(b, 'ja'))
+  }, [existingProducts])
+
+  const canSubmit = name.trim().length > 0
+
+  async function handleSubmit() {
+    if (!canSubmit) return
+    setIsSaving(true)
+    try {
+      await onSubmit(
+        name.trim(),
+        category.trim() !== '' ? category.trim() : null,
+        Number(price) > 0 ? Number(price) : null,
+        Number(amount) > 0 ? Number(amount) : null,
+        unit.trim() !== '' ? unit.trim() : null,
+      )
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  async function handleDelete() {
+    const confirmed = window.confirm(
+      `「${product.name}」を定番商品リストから完全に削除しますか?(元に戻せません)`,
+    )
+    if (!confirmed) return
+    setIsDeleting(true)
+    try {
+      await onDelete()
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-20 flex items-end justify-center bg-black/40 sm:items-center">
+      <div className="w-full max-w-sm rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-2xl">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-base font-bold text-slate-800">商品を編集</h2>
+          <button onClick={onClose} className="rounded-full p-1 text-slate-400 hover:bg-slate-100">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <label className="mb-1 block text-xs font-medium text-slate-500">商品名</label>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="mb-4 w-full rounded-lg border border-slate-300 px-3 py-3 text-base focus:border-costco-blue-500 focus:outline-none"
+        />
+
+        <label className="mb-1 block text-xs font-medium text-slate-500">カテゴリ(任意)</label>
+        <input
+          type="text"
+          list="edit-category-options"
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+          placeholder="例:日用品"
+          className="mb-4 w-full rounded-lg border border-slate-300 px-3 py-3 text-base focus:border-costco-blue-500 focus:outline-none"
+        />
+        <datalist id="edit-category-options">
+          {categoryOptions.map((c) => (
+            <option key={c} value={c} />
+          ))}
+        </datalist>
+
+        <label className="mb-1 block text-xs font-medium text-slate-500">価格(円・任意)</label>
+        <input
+          type="number"
+          inputMode="numeric"
+          value={price}
+          onChange={(e) => setPrice(e.target.value)}
+          className="mb-4 w-full rounded-lg border border-slate-300 px-3 py-3 text-base focus:border-costco-blue-500 focus:outline-none"
+        />
+
+        <label className="mb-1 block text-xs font-medium text-slate-500">内容量(任意)</label>
+        <div className="mb-6 flex gap-2">
+          <input
+            type="number"
+            inputMode="decimal"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="例:900"
+            className="w-1/2 rounded-lg border border-slate-300 px-3 py-3 text-base focus:border-costco-blue-500 focus:outline-none"
+          />
+          <input
+            type="text"
+            value={unit}
+            onChange={(e) => setUnit(e.target.value)}
+            placeholder="g等"
+            className="w-1/2 rounded-lg border border-slate-300 px-3 py-3 text-base focus:border-costco-blue-500 focus:outline-none"
+          />
+        </div>
+
+        <button
+          onClick={handleSubmit}
+          disabled={!canSubmit || isSaving}
+          className="mb-3 flex w-full items-center justify-center gap-2 rounded-xl bg-costco-blue-700 px-4 py-3 font-semibold text-white shadow transition-colors active:bg-costco-blue-800 disabled:opacity-50"
+        >
+          保存する
+        </button>
+
+        <button
+          onClick={handleDelete}
+          disabled={isDeleting}
+          className="flex w-full items-center justify-center gap-2 rounded-xl border border-red-200 px-4 py-2.5 text-sm font-medium text-red-600 disabled:opacity-50"
+        >
+          <Trash2 className="h-4 w-4" />
+          定番商品リストから削除する
         </button>
       </div>
     </div>
