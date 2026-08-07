@@ -42,6 +42,7 @@ export function ListScreen({ onOpenCart }: Props) {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [budgetInput, setBudgetInput] = useState('30000')
   const [isApplyingLastTrip, setIsApplyingLastTrip] = useState(false)
+  const [lastTripCandidates, setLastTripCandidates] = useState<Product[] | null>(null)
 
   // トリップが無ければ、初期予算3万円でplanningトリップを自動的に作る
   // (以前のアプリと同様、毎回同じようなものを買う前提で「まず一覧が
@@ -123,10 +124,10 @@ export function ListScreen({ onOpenCart }: Props) {
   }
 
   // 「前回買ったものを反映」:直近に完了した買い物トリップで実際に
-  // 購入済みだった商品を、今回のリストにチェックとして追加する。
-  // 今チェックしている他の商品を消してしまわないよう、上書きではなく
-  // 追加の扱いにしている(すでにチェック済みの商品はそのまま)
-  async function handleApplyLastTrip() {
+  // 購入済みだった商品を候補として取得し、確認シートを開く。
+  // (取捨選択してから反映する方式。一気に全部反映すると、前回だけの
+  // 一回限りの商品まで交じってしまうため、確認のワンクッションを挟む)
+  async function handleOpenApplyLastTrip() {
     setIsApplyingLastTrip(true)
     try {
       const productIds = await fetchLastCompletedTripProductIds()
@@ -134,10 +135,12 @@ export function ListScreen({ onOpenCart }: Props) {
         window.alert('前回の買い物履歴がまだありません。')
         return
       }
-      const targets = products.filter((p) => productIds.includes(p.id) && !isChecked(p.id))
-      for (const product of targets) {
-        await togglePlannedProduct(product, true)
+      const candidates = products.filter((p) => productIds.includes(p.id))
+      if (candidates.length === 0) {
+        window.alert('前回購入した商品が、現在の定番商品リストに見つかりませんでした。')
+        return
       }
+      setLastTripCandidates(candidates)
     } finally {
       setIsApplyingLastTrip(false)
     }
@@ -198,12 +201,12 @@ export function ListScreen({ onOpenCart }: Props) {
       <main className="mx-auto max-w-md px-4 py-4">
         {isPlanning && products.length > 0 && (
           <button
-            onClick={handleApplyLastTrip}
+            onClick={handleOpenApplyLastTrip}
             disabled={isApplyingLastTrip}
             className="mb-4 flex w-full items-center justify-center gap-1.5 rounded-xl border border-costco-blue-200 bg-white py-2.5 text-sm font-medium text-costco-blue-700 shadow-sm disabled:opacity-50"
           >
             <History className="h-4 w-4" />
-            {isApplyingLastTrip ? '反映しています…' : '前回買ったものを反映'}
+            {isApplyingLastTrip ? '確認中…' : '前回買ったものを反映'}
           </button>
         )}
 
@@ -380,6 +383,23 @@ export function ListScreen({ onOpenCart }: Props) {
           onDelete={async () => {
             await removeProduct(editingProduct.id)
             setEditingProduct(null)
+          }}
+        />
+      )}
+
+      {lastTripCandidates && (
+        <ApplyLastTripSheet
+          candidates={lastTripCandidates}
+          onClose={() => setLastTripCandidates(null)}
+          onSubmit={async (selected) => {
+            // 追加方式:選ばれた商品のうち、まだチェックしていないものだけ
+            // チェックする(すでにチェック済みの他の商品には影響しない)
+            for (const product of selected) {
+              if (!isChecked(product.id)) {
+                await togglePlannedProduct(product, true)
+              }
+            }
+            setLastTripCandidates(null)
           }}
         />
       )}
@@ -691,6 +711,89 @@ function EditProductSheet({ product, existingProducts, onClose, onSubmit, onDele
         >
           <Trash2 className="h-4 w-4" />
           定番商品リストから削除する
+        </button>
+      </div>
+    </div>
+  )
+}
+
+type ApplyLastTripSheetProps = {
+  /** 前回の買い物で購入済みだった、定番商品リスト上の商品(候補) */
+  candidates: Product[]
+  onClose: () => void
+  onSubmit: (selected: Product[]) => Promise<void>
+}
+
+/** 「前回買ったものを反映」の確認シート。
+ * 前回購入した商品を一覧表示し、デフォルトで全てチェック済みにしておく。
+ * 今回は不要なものだけチェックを外してから反映できるようにすることで、
+ * 一回限りの商品(誕生日ケーキなど)を毎回間違って含めてしまうのを防ぐ */
+function ApplyLastTripSheet({ candidates, onClose, onSubmit }: ApplyLastTripSheetProps) {
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set(candidates.map((p) => p.id)))
+  const [isSaving, setIsSaving] = useState(false)
+
+  function toggle(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  async function handleSubmit() {
+    if (selectedIds.size === 0) return
+    setIsSaving(true)
+    try {
+      await onSubmit(candidates.filter((p) => selectedIds.has(p.id)))
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-20 flex items-end justify-center bg-black/40 sm:items-center">
+      <div className="flex max-h-[80vh] w-full max-w-sm flex-col rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-2xl">
+        <div className="mb-1 flex items-center justify-between">
+          <h2 className="text-base font-bold text-slate-800">前回買ったものを反映</h2>
+          <button onClick={onClose} className="rounded-full p-1 text-slate-400 hover:bg-slate-100">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <p className="mb-3 text-xs text-slate-400">今回は不要なものはチェックを外してください。</p>
+
+        <ul className="mb-4 flex-1 space-y-1.5 overflow-y-auto">
+          {candidates.map((product) => {
+            const checked = selectedIds.has(product.id)
+            return (
+              <li key={product.id}>
+                <button
+                  onClick={() => toggle(product.id)}
+                  className="flex w-full items-center gap-2 rounded-xl bg-slate-50 px-3 py-2.5 text-left"
+                >
+                  <span
+                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 ${
+                      checked ? 'border-costco-red-600 bg-costco-red-600' : 'border-slate-300'
+                    }`}
+                  >
+                    {checked && <Check className="h-3.5 w-3.5 text-white" />}
+                  </span>
+                  <span className={`flex-1 truncate text-sm ${checked ? 'text-slate-800' : 'text-slate-400'}`}>
+                    {product.name}
+                  </span>
+                  <span className="shrink-0 text-xs text-slate-400">¥{(product.defaultPrice ?? 0).toLocaleString()}</span>
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+
+        <button
+          onClick={handleSubmit}
+          disabled={isSaving || selectedIds.size === 0}
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-costco-red-600 px-4 py-3 font-semibold text-white shadow transition-colors active:bg-costco-red-700 disabled:opacity-50"
+        >
+          {selectedIds.size}件を反映する
         </button>
       </div>
     </div>
