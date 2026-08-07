@@ -68,6 +68,8 @@ export type TripItem = {
   quantity: number
   /** planned=事前の今回買うものリスト由来、scan=バーコードスキャン由来 */
   source: 'planned' | 'scan'
+  /** バーコードスキャンで追加した場合の読み取り番号(次回同じ商品を素早く認識するために使う) */
+  barcode: string | null
   createdAt: string
   addedToCartAt: string | null
 }
@@ -111,6 +113,7 @@ type TripStoreState = {
     amount: number | null
     unit: string | null
     quantity: number
+    barcode: string | null
   }) => Promise<void>
   updateCartItemQuantity: (tripItemId: string, quantity: number) => Promise<void>
   removeTripItem: (tripItemId: string) => Promise<void>
@@ -208,6 +211,7 @@ export const useTripStore = create<TripStoreState>((set, get) => ({
                     unit: (data.unit ?? null) as string | null,
                     quantity: (data.quantity ?? 1) as number,
                     source: data.source as 'planned' | 'scan',
+                    barcode: (data.barcode ?? null) as string | null,
                     createdAt: (data.createdAt ?? '') as string,
                     addedToCartAt: (data.addedToCartAt ?? null) as string | null,
                   }
@@ -347,6 +351,7 @@ export const useTripStore = create<TripStoreState>((set, get) => ({
       unit: details.unit,
       quantity: details.quantity,
       source: 'scan',
+      barcode: details.barcode,
       createdAt: now,
       addedToCartAt: now,
     })
@@ -443,4 +448,36 @@ export async function fetchLastCompletedTripProductIds(): Promise<string[]> {
     .map((d) => d.data().productId as string | null)
     .filter((id): id is string => id !== null)
   return [...new Set(productIds)]
+}
+
+/**
+ * 過去にバーコードスキャンで記録した商品を、同じバーコード番号から探す。
+ * 「定番商品リスト」ではなく「過去のスキャン履歴」から探す設計にしている
+ * (バーコードスキャンは主に、定番商品リストに無い・その場限りの商品を
+ * 追加するための機能のため。定番商品リストと紐付けても、ほとんど
+ * ヒットしないと考えられる)。
+ * 同じバーコードが複数回記録されていれば、直近の内容(価格など)を優先する
+ */
+export async function fetchTripItemByBarcode(barcode: string): Promise<{
+  name: string
+  category: string | null
+  price: number | null
+  amount: number | null
+  unit: string | null
+} | null> {
+  const householdId = requireHouseholdId()
+  const snapshot = await getDocs(
+    query(householdCollection(householdId, 'tripItems'), where('barcode', '==', barcode)),
+  )
+  const rows = snapshot.docs
+    .map((d) => ({
+      name: d.data().productName as string,
+      category: (d.data().category ?? null) as string | null,
+      price: (d.data().price ?? null) as number | null,
+      amount: (d.data().amount ?? null) as number | null,
+      unit: (d.data().unit ?? null) as string | null,
+      createdAt: (d.data().createdAt ?? '') as string,
+    }))
+    .sort((a, b) => (a.createdAt > b.createdAt ? -1 : 1))
+  return rows[0] ?? null
 }
