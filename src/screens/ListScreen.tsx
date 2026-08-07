@@ -281,7 +281,11 @@ export function ListScreen({ onOpenCart }: Props) {
           existingProducts={products}
           onClose={() => setIsAddProductOpen(false)}
           onSubmit={async (name, category, price, amount, unit) => {
-            await addProduct(name, category, price, amount, unit)
+            const newProduct = await addProduct(name, category, price, amount, unit)
+            // 登録した商品は、その場で今回買うものリストにも含める(チェック済みに
+            // する)。登録直後に「除外されている」ような見た目(取り消し線)に
+            // なってしまうのを防ぐため
+            await togglePlannedProduct(newProduct, true)
             setIsAddProductOpen(false)
           }}
         />
