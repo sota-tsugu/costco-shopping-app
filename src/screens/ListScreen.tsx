@@ -1,16 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Check, ChevronRight, Settings, ShoppingCart, X } from 'lucide-react'
+import { Plus, Check, ChevronRight, Settings, ShoppingCart, X, Search } from 'lucide-react'
 import { useTripStore, type Product, type TripItem } from '../store/tripStore'
 import { SettingsModal } from './SettingsModal'
 import { TricolorAccent } from '../components/TricolorAccent'
+import { PRODUCT_CATALOG } from '../data/productCatalog'
 
 // 画面A:今回買うものリスト画面。
 // 買い物前の計画(定番商品リストから選ぶ・予算設定)から、店内での進行管理
 // (検討中→会計待ち→購入済の状態表示)まで、一貫して担う中心画面。
 //
 // 【フェーズ1(最小実装)の割り切り】
-// - 商品名候補データベース(costcotuu.com由来)との連携は今回は見送り、
-//   定番商品の登録は自由入力のみにしている(後日追加できる)
 // - 「カートに入れる」時の演出(飛んでいくアニメーション等)はフェーズ3で
 //   追加する。今回は状態がその場で切り替わるだけのシンプルな実装
 // - 商品名タップでの購入履歴・単価比較の詳細画面は、購入データが
@@ -279,6 +278,7 @@ export function ListScreen({ onOpenCart }: Props) {
 
       {isAddProductOpen && (
         <AddProductSheet
+          existingProducts={products}
           onClose={() => setIsAddProductOpen(false)}
           onSubmit={async (name, category, price, amount, unit) => {
             await addProduct(name, category, price, amount, unit)
@@ -293,6 +293,7 @@ export function ListScreen({ onOpenCart }: Props) {
 }
 
 type AddProductSheetProps = {
+  existingProducts: Product[]
   onClose: () => void
   onSubmit: (
     name: string,
@@ -303,13 +304,39 @@ type AddProductSheetProps = {
   ) => Promise<void>
 }
 
-function AddProductSheet({ onClose, onSubmit }: AddProductSheetProps) {
+function AddProductSheet({ existingProducts, onClose, onSubmit }: AddProductSheetProps) {
   const [name, setName] = useState('')
   const [category, setCategory] = useState('')
   const [price, setPrice] = useState('')
   const [amount, setAmount] = useState('')
   const [unit, setUnit] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+  const [isSuggestionsOpen, setIsSuggestionsOpen] = useState(false)
+
+  // 商品名候補データベース(costcotuu.com由来・約3200件)から、商品名の
+  // 入力補助を行う。名前を選ぶとカテゴリも一緒に入る。2文字以上で検索する
+  const nameSuggestions = useMemo(() => {
+    const trimmed = name.trim().toLowerCase()
+    if (trimmed.length < 2) return []
+    return PRODUCT_CATALOG.filter((entry) => entry.name.toLowerCase().includes(trimmed)).slice(0, 12)
+  }, [name])
+
+  // カテゴリの選択補助:候補データベースと、すでに登録済みの定番商品の
+  // カテゴリをあわせて、入力候補(datalist)として出す(表記ゆれを防ぐため)
+  const categoryOptions = useMemo(() => {
+    const set = new Set<string>()
+    for (const entry of PRODUCT_CATALOG) set.add(entry.category)
+    for (const product of existingProducts) {
+      if (product.category) set.add(product.category)
+    }
+    return [...set].sort((a, b) => a.localeCompare(b, 'ja'))
+  }, [existingProducts])
+
+  function handlePickSuggestion(entry: { name: string; category: string }) {
+    setName(entry.name)
+    setCategory(entry.category)
+    setIsSuggestionsOpen(false)
+  }
 
   const canSubmit = name.trim().length > 0
 
@@ -340,22 +367,51 @@ function AddProductSheet({ onClose, onSubmit }: AddProductSheetProps) {
         </div>
 
         <label className="mb-1 block text-xs font-medium text-slate-500">商品名</label>
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="例:トイレットペーパー"
-          className="mb-4 w-full rounded-lg border border-slate-300 px-3 py-3 text-base focus:border-costco-blue-500 focus:outline-none"
-        />
+        <div className="relative mb-4">
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value)
+              setIsSuggestionsOpen(true)
+            }}
+            onFocus={() => setIsSuggestionsOpen(true)}
+            placeholder="例:トイレットペーパー"
+            className="w-full rounded-lg border border-slate-300 px-3 py-3 text-base focus:border-costco-blue-500 focus:outline-none"
+          />
+          {isSuggestionsOpen && nameSuggestions.length > 0 && (
+            <ul className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
+              {nameSuggestions.map((entry, index) => (
+                <li key={`${entry.name}-${index}`}>
+                  <button
+                    type="button"
+                    onClick={() => handlePickSuggestion(entry)}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50"
+                  >
+                    <Search className="h-3.5 w-3.5 shrink-0 text-slate-300" />
+                    <span className="flex-1 truncate">{entry.name}</span>
+                    <span className="shrink-0 text-xs text-slate-400">{entry.category}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
         <label className="mb-1 block text-xs font-medium text-slate-500">カテゴリ(任意)</label>
         <input
           type="text"
+          list="category-options"
           value={category}
           onChange={(e) => setCategory(e.target.value)}
           placeholder="例:日用品"
           className="mb-4 w-full rounded-lg border border-slate-300 px-3 py-3 text-base focus:border-costco-blue-500 focus:outline-none"
         />
+        <datalist id="category-options">
+          {categoryOptions.map((c) => (
+            <option key={c} value={c} />
+          ))}
+        </datalist>
 
         <label className="mb-1 block text-xs font-medium text-slate-500">価格(円・任意)</label>
         <input
