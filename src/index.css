@@ -1,3 +1,23 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+ * 画面A/画面Bをスワイプ(またはボタン)で切り替えた時の、軽いフェード
+ * イン演出。画面が変わったことに気づきやすくするための最小限の演出。
+ * (src/App.tsxのtransitionKeyでこのクラスの要素を再マウントして再生する)
+ */
+@keyframes screen-fade-in {
+  0% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.screen-fade-in {
+  animation: screen-fade-in 0.18s ease-out;
+}
