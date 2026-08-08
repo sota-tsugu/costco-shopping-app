@@ -97,7 +97,10 @@ function computeItemStyle(index: number): ItemStyle {
   const v = V_BOTTOM - row * ROW_STEP + (r1 - 0.5) * 0.06
   const vForWidth = Math.max(v, 0)
   let u = (col + 0.5) / ITEMS_PER_ROW + (r2 - 0.5) * 0.34
-  u = Math.min(Math.max(u, 0.04), 0.96)
+  // 左右の端ぎりぎり(0や1に近い位置)だと、商品の絵文字の左右端が
+  // 網目の外(白い背景側)に突き抜けて見えてしまうため、両端に余白を
+  // 持たせている(底の突き抜け対策(V_BOTTOM)と同じ考え方)
+  u = Math.min(Math.max(u, 0.12), 0.88)
 
   // 天井(MOUND_CEILING_PERCENT)を超える高さになる分は、そのまま上に
   // 伸ばさず、天井付近の帯(MOUND_CEILING_BAND_PERCENT)にランダムに
