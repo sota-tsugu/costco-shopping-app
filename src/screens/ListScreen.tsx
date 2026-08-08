@@ -188,13 +188,27 @@ export function ListScreen({ onOpenCart }: Props) {
         <TricolorAccent />
         <div className="mt-3 flex items-center justify-between">
           <h1 className="text-base font-semibold">今回買うものリスト</h1>
-          <button
-            onClick={() => setIsSettingsOpen(true)}
-            className="rounded-full p-1 text-costco-blue-100 transition-colors hover:bg-costco-blue-600"
-            aria-label="設定"
-          >
-            <Settings className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-1">
+            {/* 計画中は空っぽ(薄い色・バッジ無し)、買い物中は商品が入り
+                始めたことが分かるよう白色+件数バッジで表す。カートの
+                イラストそのものは画面Bの役割と重複するため、既存の
+                ShoppingCartアイコンの見た目だけを変える軽いタッチにしている */}
+            <div className="relative mr-1">
+              <ShoppingCart className={`h-5 w-5 ${isActive ? 'text-white' : 'text-costco-blue-300'}`} />
+              {isActive && cartCount > 0 && (
+                <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-costco-red-600 px-1 text-[10px] font-bold leading-none text-white">
+                  {cartCount}
+                </span>
+              )}
+            </div>
+            <button
+              onClick={() => setIsSettingsOpen(true)}
+              className="rounded-full p-1 text-costco-blue-100 transition-colors hover:bg-costco-blue-600"
+              aria-label="設定"
+            >
+              <Settings className="h-5 w-5" />
+            </button>
+          </div>
         </div>
 
         {isPlanning && (
