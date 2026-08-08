@@ -21,3 +21,25 @@
 .screen-fade-in {
   animation: screen-fade-in 0.18s ease-out;
 }
+
+/*
+ * 画面B:カートに商品(絵文字)が追加された時の、軽い「ポン」と現れる演出。
+ * 位置(left/top)を担う外側のspanにこのクラスを付ける。内側のspanが
+ * 商品ごとのランダムな大きさ・傾きを担当するので、ここでは中央寄せの
+ * translate(-50%,-50%)を保ったまま、拡大率(scale)だけをアニメーションさせる
+ * (src/components/CartFillDisplay.tsxを参照)
+ */
+@keyframes cart-item-pop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.3);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+.cart-item-pop {
+  animation: cart-item-pop 0.25s ease-out both;
+}

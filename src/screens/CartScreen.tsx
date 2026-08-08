@@ -3,20 +3,19 @@ import { ArrowLeft, CheckCircle2, Camera } from 'lucide-react'
 import { useTripStore } from '../store/tripStore'
 import { TricolorAccent } from '../components/TricolorAccent'
 import { BarcodeScanSheet } from '../components/BarcodeScanSheet'
-import cartImage from '../assets/cart-icon.jpg'
+import { CartFillDisplay } from '../components/CartFillDisplay'
 
 // 画面B:カートのビジュアル確認画面(ホーム/メイン画面・会計の入り口)。
 // 「カートそのものに集中する」画面。一覧・編集は画面Aに集約したので、
 // この画面はカートの視覚的な確認・バーコードスキャン・会計に専念する。
 //
-// 【フェーズ1(最小実装)の割り切り】
-// - カートの中身が積み上がっていくアニメーションはフェーズ3で追加する。
-//   今回はカートの写真+合計金額のシンプルな表示のみ
-//
 // 【フェーズ2】バーコードスキャン(カメラアイコン)を実装。計画リストに
 // 無かった商品を、その場でスキャンしてカートに追加できる。追加された
 // 商品はtripItemとして記録されるため、画面Aのリストにも自動的に表示される
 // (BarcodeScanSheet・tripStore.addScannedItemを参照)
+//
+// 【フェーズ3】カートに商品が入っていくたびに、カート写真の中に絵文字が
+// 増えていくアニメーションを実装(CartFillDisplayを参照)
 
 type Props = {
   /** リスト画面(画面A)へ戻る時に呼ぶ */
@@ -71,7 +70,7 @@ export function CartScreen({ onBack }: Props) {
           バーコードで追加
         </button>
 
-        <img src={cartImage} alt="カート" className="w-full max-w-xs" />
+        <CartFillDisplay itemCount={itemCount} />
 
         <div className="mt-4 text-center">
           <p className="text-sm text-slate-500">カート内 {itemCount}点</p>
