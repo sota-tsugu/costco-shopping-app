@@ -2,7 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { BrowserMultiFormatReader } from '@zxing/browser'
 import { X, Camera } from 'lucide-react'
 import { fetchTripItemByBarcode, type Product } from '../store/tripStore'
-import { fetchOpenFoodFactsProduct } from '../utils/openFoodFacts'
+import {
+  fetchOpenFoodFactsProduct,
+  fetchOpenProductsFactsProduct,
+  fetchOpenBeautyFactsProduct,
+} from '../utils/openFactsDatabases'
 
 // バーコードスキャンで、計画リストに無かった商品をその場で追加するための
 // フルスクリーンシート。カメラでバーコードを読み取ったら、次の順番で
@@ -10,7 +14,12 @@ import { fetchOpenFoodFactsProduct } from '../utils/openFoodFacts'
 // ①自分たちの過去のスキャン履歴(tripItems内のbarcode一致)
 // ②Open Food Facts(無料・食品飲料中心の外部データベース。カークランド等の
 //   プライベートブランドは弱いが、全国区のブランド品はヒットすることがある)
-// ③どちらも見つからなければ、バーコード番号だけ分かっている状態で手入力
+// ③Open Products Facts(食品・化粧品以外の一般商品。洗剤・紙製品など)
+// ④Open Beauty Facts(化粧品・ボディケア用品)
+// ⑤どれも見つからなければ、バーコード番号だけ分かっている状態で手入力
+//
+// ②〜④はいずれも同じ運営元(Open Food Facts)による無料・APIキー不要の
+// 姉妹データベースで、ジャンルごとにサイトが分かれている
 //
 // どのパターンでも、最後は必ず内容を確認・編集できる画面を経由してから
 // 「カートに追加する」を押す(読み取り間違い・価格の変動に備えるため)
@@ -97,19 +106,30 @@ export function BarcodeScanSheet({ existingProducts, onClose, onSubmit }: Props)
       return
     }
 
-    // ②Open Food Facts(食品・飲料中心の無料データベース)を試す
-    const offResult = await fetchOpenFoodFactsProduct(code)
-    if (offResult) {
-      setName(offResult.name)
-      setAmount(offResult.amount !== null ? String(offResult.amount) : '')
-      setUnit(offResult.unit ?? '')
-      setLookupMatched(true)
-      setLookupNote('Open Food Factsから商品名を取得しました。価格などは手入力してください。')
-      setPhase('confirming')
-      return
+    // ②〜④Open Food Facts系の姉妹データベースを順に試す
+    // (食品→一般商品→化粧品の順。カテゴリの絞り込みはせず、単純に順番に問い合わせる)
+    const externalSources: Array<{
+      fetch: (code: string) => ReturnType<typeof fetchOpenFoodFactsProduct>
+      label: string
+    }> = [
+      { fetch: fetchOpenFoodFactsProduct, label: 'Open Food Facts' },
+      { fetch: fetchOpenProductsFactsProduct, label: 'Open Products Facts' },
+      { fetch: fetchOpenBeautyFactsProduct, label: 'Open Beauty Facts' },
+    ]
+    for (const source of externalSources) {
+      const result = await source.fetch(code)
+      if (result) {
+        setName(result.name)
+        setAmount(result.amount !== null ? String(result.amount) : '')
+        setUnit(result.unit ?? '')
+        setLookupMatched(true)
+        setLookupNote(`${source.label}から商品名を取得しました。価格などは手入力してください。`)
+        setPhase('confirming')
+        return
+      }
     }
 
-    // ③見つからなければ手入力(「なぜ何も反映されないのか」が分からず
+    // ⑤見つからなければ手入力(「なぜ何も反映されないのか」が分からず
     // 不安にならないよう、見つからなかったことをはっきり伝える)
     setLookupMatched(false)
     setLookupNote('一致する商品情報が見つかりませんでした。商品名・価格を入力してください。')
