@@ -25,18 +25,19 @@
 /*
  * 画面B:カートに商品(絵文字)が追加された時の、軽い「ポン」と現れる演出。
  * 位置(left/top)を担う外側のspanにこのクラスを付ける。内側のspanが
- * 商品ごとのランダムな大きさ・傾きを担当するので、ここでは中央寄せの
- * translate(-50%,-50%)を保ったまま、拡大率(scale)だけをアニメーションさせる
- * (src/components/CartFillDisplay.tsxを参照)
+ * 商品ごとのランダムな大きさ・傾きを担当するので、ここでは基準点
+ * translate(-50%,-70%)(中央よりやや下寄り。商品の「底」がその場に
+ * 置かれているように見せるための位置)を保ったまま、拡大率(scale)だけ
+ * アニメーションさせる(src/components/CartFillDisplay.tsxを参照)
  */
 @keyframes cart-item-pop {
   0% {
     opacity: 0;
-    transform: translate(-50%, -50%) scale(0.3);
+    transform: translate(-50%, -70%) scale(0.3);
   }
   100% {
     opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
+    transform: translate(-50%, -70%) scale(1);
   }
 }
 

@@ -35,6 +35,10 @@ const EMOJI_POOL = ['🥛', '🧃', '📦', '🍞', '🧀', '🥩', '🥦', '�
 
 const ITEMS_PER_ROW = 5
 const ROW_STEP = 0.16
+// 一番下の行の基準位置。1.0(バスケットの底のライン)ぴったりにすると、
+// 商品の絵文字の下半分がカゴの底を突き抜けて見えてしまうため、少し
+// 手前(小さい値)に余白を持たせている
+const V_BOTTOM = 0.88
 
 function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t
@@ -78,8 +82,8 @@ function computeItemStyle(index: number): ItemStyle {
   const r4 = seededRandom(index * 9 + 4)
   const r5 = seededRandom(index * 9 + 5)
 
-  // v: 1=バスケットの底(手前)、0=カートの縁。0を下回ると縁を超えて山盛りになる
-  const v = 1 - row * ROW_STEP + (r1 - 0.5) * 0.06
+  // v: V_BOTTOM=バスケットの底付近(手前)、0=カートの縁。0を下回ると縁を超えて山盛りになる
+  const v = V_BOTTOM - row * ROW_STEP + (r1 - 0.5) * 0.06
   const vForWidth = Math.max(v, 0)
   let u = (col + 0.5) / ITEMS_PER_ROW + (r2 - 0.5) * 0.34
   u = Math.min(Math.max(u, 0.04), 0.96)
