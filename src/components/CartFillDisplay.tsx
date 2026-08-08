@@ -10,6 +10,9 @@ import cartFrontMesh from '../assets/cart-icon-front.png'
 // 【配置ロジックの考え方】
 // - バスケットの底(手前)からカートの縁に向かって、行ごとに敷き詰めていく
 // - 縁を超えたら、同じ横幅のまま上に積み上がっていく(山盛り。件数の上限なし)
+// - ただし山盛りの「高さ」には天井(MOUND_CEILING_PERCENT)があり、天井に
+//   達した分は同じ高さ付近に密度高く散らす(画面上部の「バーコードで
+//   追加」ボタンに商品が重ならないようにするため。件数自体は減らさない)
 // - 大きさ(1.5〜2倍)・重なり・傾きはすべて商品ごとにランダム
 // - 同じindexには常に同じ乱数(seededRandom)を使うことで、商品が増減しても
 //   既存の商品の見た目が変わらないようにしている
@@ -39,6 +42,13 @@ const ROW_STEP = 0.16
 // 商品の絵文字の下半分がカゴの底を突き抜けて見えてしまうため、少し
 // 手前(小さい値)に余白を持たせている
 const V_BOTTOM = 0.88
+
+// 山盛りが上に伸びていく高さの天井(画像内でのtop位置、%)。件数自体には
+// 上限を設けないが(仕様通り)、見た目の高さには天井を設け、画面上部の
+// 「バーコードで追加」ボタンに商品が重ならないようにしている。天井に
+// 達した分は、同じ高さ付近にランダムに散らして密度を上げる形で表現する
+const MOUND_CEILING_PERCENT = -6
+const MOUND_CEILING_BAND_PERCENT = 8
 
 function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t
@@ -81,6 +91,7 @@ function computeItemStyle(index: number): ItemStyle {
   const r3 = seededRandom(index * 9 + 3)
   const r4 = seededRandom(index * 9 + 4)
   const r5 = seededRandom(index * 9 + 5)
+  const r6 = seededRandom(index * 9 + 6)
 
   // v: V_BOTTOM=バスケットの底付近(手前)、0=カートの縁。0を下回ると縁を超えて山盛りになる
   const v = V_BOTTOM - row * ROW_STEP + (r1 - 0.5) * 0.06
@@ -88,10 +99,19 @@ function computeItemStyle(index: number): ItemStyle {
   let u = (col + 0.5) / ITEMS_PER_ROW + (r2 - 0.5) * 0.34
   u = Math.min(Math.max(u, 0.04), 0.96)
 
+  // 天井(MOUND_CEILING_PERCENT)を超える高さになる分は、そのまま上に
+  // 伸ばさず、天井付近の帯(MOUND_CEILING_BAND_PERCENT)にランダムに
+  // 散らす。これにより件数は減らさずに、見た目の高さだけ頭打ちにできる
+  const rawTopPercent = basketY(u, v) * 100
+  const topPercent =
+    rawTopPercent < MOUND_CEILING_PERCENT
+      ? MOUND_CEILING_PERCENT + r6 * MOUND_CEILING_BAND_PERCENT
+      : rawTopPercent
+
   return {
     key: index,
     leftPercent: basketX(u, vForWidth) * 100,
-    topPercent: basketY(u, v) * 100,
+    topPercent,
     scale: 1.5 + r3 * 0.5,
     rotateDeg: (r4 - 0.5) * 50,
     emoji: EMOJI_POOL[Math.floor(r5 * EMOJI_POOL.length)],
