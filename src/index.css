@@ -44,3 +44,95 @@
 .cart-item-pop {
   animation: cart-item-pop 0.25s ease-out both;
 }
+
+/*
+ * 起動時の「あいさつ画面」(SplashScreen)のアニメーション。
+ * 赤白のストライプが斜めに勢いよく滑り込み→「COSTCO GO」の文字が
+ * 浮かぶ→フェードアウトしながら、タップ可能な白い丸バッジ
+ * (COSTCO GO)が中央にポップインする、という流れ。
+ * mcp visualizeツールで試作し、SOTAさんと確認したオリジナルデザイン
+ * (コストコの公式ロゴは使わず、独自の配色・文字だけで表現している)
+ */
+@keyframes splash-stripe-in {
+  from {
+    transform: rotate(-14deg) translateX(-100%);
+  }
+  to {
+    transform: rotate(-14deg) translateX(0%);
+  }
+}
+
+@keyframes splash-stripe-in-delay {
+  from {
+    transform: rotate(-14deg) translateX(-120%);
+  }
+  to {
+    transform: rotate(-14deg) translateX(0%);
+  }
+}
+
+@keyframes splash-word-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes splash-cart-in {
+  from {
+    transform: translate(-350%, -50%);
+  }
+  to {
+    transform: translate(-50%, -50%);
+  }
+}
+
+@keyframes splash-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes splash-badge-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.4);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+.splash-stripe-1 {
+  animation:
+    splash-stripe-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) both,
+    splash-fade-out 0.25s ease-out 0.65s both;
+}
+
+.splash-stripe-2 {
+  animation:
+    splash-stripe-in-delay 0.45s cubic-bezier(0.16, 1, 0.3, 1) 0.05s both,
+    splash-fade-out 0.25s ease-out 0.65s both;
+}
+
+.splash-word {
+  animation:
+    splash-word-in 0.3s ease-out 0.3s both,
+    splash-fade-out 0.25s ease-out 0.65s both;
+}
+
+.splash-cart {
+  animation:
+    splash-cart-in 0.55s cubic-bezier(0.16, 1, 0.3, 1) 0.15s both,
+    splash-fade-out 0.25s ease-out 0.7s both;
+}
+
+.splash-badge {
+  animation: splash-badge-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) 0.7s both;
+}

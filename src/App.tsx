@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type TouchEvent } from 'react'
 import { HouseholdSetupScreen } from './screens/HouseholdSetupScreen'
+import { SplashScreen } from './screens/SplashScreen'
 import { ListScreen } from './screens/ListScreen'
 import { CartScreen } from './screens/CartScreen'
 import { UpdateBanner } from './components/UpdateBanner'
@@ -28,6 +29,9 @@ const SWIPE_THRESHOLD_PX = 60
 
 function App() {
   const [householdReady, setHouseholdReady] = useState(() => getSavedHouseholdId() !== null)
+  // 起動のたびに一度だけ、あいさつ画面(SplashScreen)を挟んでから
+  // 本編(今回買うものリスト)へ進む。タップされるまでは本編を表示しない
+  const [splashDismissed, setSplashDismissed] = useState(false)
   const [view, setView] = useState<'list' | 'cart'>('list')
   const [transitionKey, setTransitionKey] = useState(0)
 
@@ -80,6 +84,10 @@ function App() {
 
   if (!householdReady) {
     return <HouseholdSetupScreen onReady={() => setHouseholdReady(true)} />
+  }
+
+  if (!splashDismissed) {
+    return <SplashScreen onContinue={() => setSplashDismissed(true)} />
   }
 
   if (errorMessage) {
