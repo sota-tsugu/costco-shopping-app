@@ -124,8 +124,21 @@ function computeItemStyle(index: number): ItemStyle {
 }
 
 // バスケット内側の台形部分だけを切り抜くためのclip-path(%指定)。
-// 商品の配置に使っているBASKET_TOP_LEFT等と同じ4点を使う
-const BASKET_CLIP_PATH = `polygon(${[BASKET_TOP_LEFT, BASKET_TOP_RIGHT, BASKET_BOTTOM_RIGHT, BASKET_BOTTOM_LEFT]
+// 商品の配置に使っているBASKET_TOP_LEFT等の4点をそのまま使うと、実際の
+// 網目の描画範囲より少し内側になってしまい、切り抜きの境目で網目の
+// 縦線が途中で途切れて見えることがあった(境目のすぐ外側は元の写真が
+// そのまま見えるはずが、そこに商品の絵文字が重なって線を隠してしまうため)。
+// そのため、切り抜きの範囲は商品の配置範囲より少し広めに取っている
+// (写真自体は透明背景のPNGなので、広めに切り抜いても網目や縁以外の
+// 余計なものが映り込むことはない)
+const CLIP_MARGIN_X = 0.04
+const CLIP_MARGIN_Y = 0.03
+const CLIP_TOP_LEFT: [number, number] = [BASKET_TOP_LEFT[0] - CLIP_MARGIN_X, BASKET_TOP_LEFT[1] - CLIP_MARGIN_Y]
+const CLIP_TOP_RIGHT: [number, number] = [BASKET_TOP_RIGHT[0] + CLIP_MARGIN_X, BASKET_TOP_RIGHT[1] - CLIP_MARGIN_Y]
+const CLIP_BOTTOM_LEFT: [number, number] = [BASKET_BOTTOM_LEFT[0] - CLIP_MARGIN_X, BASKET_BOTTOM_LEFT[1] + CLIP_MARGIN_Y]
+const CLIP_BOTTOM_RIGHT: [number, number] = [BASKET_BOTTOM_RIGHT[0] + CLIP_MARGIN_X, BASKET_BOTTOM_RIGHT[1] + CLIP_MARGIN_Y]
+
+const BASKET_CLIP_PATH = `polygon(${[CLIP_TOP_LEFT, CLIP_TOP_RIGHT, CLIP_BOTTOM_RIGHT, CLIP_BOTTOM_LEFT]
   .map(([x, y]) => `${(x * 100).toFixed(2)}% ${(y * 100).toFixed(2)}%`)
   .join(', ')})`
 
