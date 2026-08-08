@@ -451,6 +451,22 @@ export async function fetchLastCompletedTripProductIds(): Promise<string[]> {
 }
 
 /**
+ * 直近に完了した買い物トリップの、実際の合計金額(actualTotal)を取得する。
+ * 画面Aの計画中(planning)の見込み合計の隣に「前回の購入額」として
+ * 表示するために使う。まだ買い物を1回も完了していない場合はnullを返す
+ */
+export async function fetchLastCompletedTripTotal(): Promise<number | null> {
+  const householdId = requireHouseholdId()
+  const tripsSnapshot = await getDocs(
+    query(householdCollection(householdId, 'shoppingTrips'), where('status', '==', 'completed')),
+  )
+  const trips = tripsSnapshot.docs
+    .map((d) => ({ completedAt: (d.data().completedAt ?? '') as string, actualTotal: (d.data().actualTotal ?? null) as number | null }))
+    .sort((a, b) => (a.completedAt > b.completedAt ? -1 : 1))
+  return trips[0]?.actualTotal ?? null
+}
+
+/**
  * 過去にバーコードスキャンで記録した商品を、同じバーコード番号から探す。
  * 「定番商品リスト」ではなく「過去のスキャン履歴」から探す設計にしている
  * (バーコードスキャンは主に、定番商品リストに無い・その場限りの商品を

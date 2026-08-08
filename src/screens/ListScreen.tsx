@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Plus, Check, ChevronRight, Settings, ShoppingCart, X, Search, Minus, Trash2, Pencil, History } from 'lucide-react'
-import { useTripStore, fetchLastCompletedTripProductIds, type Product, type TripItem } from '../store/tripStore'
+import {
+  useTripStore,
+  fetchLastCompletedTripProductIds,
+  fetchLastCompletedTripTotal,
+  type Product,
+  type TripItem,
+} from '../store/tripStore'
 import { SettingsModal } from './SettingsModal'
 import { TricolorAccent } from '../components/TricolorAccent'
 import { PRODUCT_CATALOG } from '../data/productCatalog'
@@ -43,6 +49,7 @@ export function ListScreen({ onOpenCart }: Props) {
   const [budgetInput, setBudgetInput] = useState('30000')
   const [isApplyingLastTrip, setIsApplyingLastTrip] = useState(false)
   const [lastTripCandidates, setLastTripCandidates] = useState<Product[] | null>(null)
+  const [lastTripTotal, setLastTripTotal] = useState<number | null>(null)
 
   // トリップが無ければ、初期予算3万円でplanningトリップを自動的に作る
   // (以前のアプリと同様、毎回同じようなものを買う前提で「まず一覧が
@@ -64,9 +71,26 @@ export function ListScreen({ onOpenCart }: Props) {
     [tripItems],
   )
 
+  // 商品id→検討中のtripItem。数量の参照・変更に使う
+  const consideringItemByProductId = useMemo(() => {
+    const map = new Map<string, TripItem>()
+    for (const item of tripItems) {
+      if (item.status === 'considering' && item.productId) map.set(item.productId, item)
+    }
+    return map
+  }, [tripItems])
+
   function isChecked(productId: string) {
     return consideringProductIds.has(productId)
   }
+
+  // 計画中(planning)は、直近に完了した買い物の合計額を「前回の購入額」
+  // として表示する(予算を決める際の目安になるように)。トリップが
+  // 切り替わるたび(新しい買い物を始めるたび)に最新の値を取り直す
+  useEffect(() => {
+    if (!isPlanning) return
+    void fetchLastCompletedTripTotal().then(setLastTripTotal)
+  }, [isPlanning, currentTrip?.id])
 
   async function handleToggle(product: Product) {
     await togglePlannedProduct(product, !isChecked(product.id))
@@ -81,10 +105,11 @@ export function ListScreen({ onOpenCart }: Props) {
 
   const estimatedTotal = useMemo(() => {
     return products.reduce((sum, p) => {
-      if (!isChecked(p.id)) return sum
-      return sum + (p.defaultPrice ?? 0)
+      const item = consideringItemByProductId.get(p.id)
+      if (!item) return sum
+      return sum + (p.defaultPrice ?? 0) * item.quantity
     }, 0)
-  }, [products, consideringProductIds])
+  }, [products, consideringItemByProductId])
 
   const cartTotal = useMemo(() => {
     return tripItems
@@ -167,22 +192,32 @@ export function ListScreen({ onOpenCart }: Props) {
         </div>
 
         {isPlanning && (
-          <div className="mt-3 flex items-end justify-between">
-            <div>
-              <span className="text-xs text-costco-blue-100">見込み合計</span>
-              <div className="text-2xl font-semibold tracking-tight">¥{estimatedTotal.toLocaleString()}</div>
+          <div className="mt-3">
+            <div className="flex items-end justify-between">
+              <div>
+                <span className="text-xs text-costco-blue-100">見込み合計</span>
+                <div className="text-2xl font-semibold tracking-tight">¥{estimatedTotal.toLocaleString()}</div>
+              </div>
+              <div className="flex flex-col items-end">
+                <span className="text-xs text-costco-blue-100">予算</span>
+                <label className="flex items-center gap-1 text-xl font-semibold">
+                  ¥
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={budgetInput}
+                    onChange={(e) => setBudgetInput(e.target.value)}
+                    onBlur={handleBudgetBlur}
+                    className="w-24 border-b border-costco-blue-300 bg-transparent text-right text-xl font-semibold text-white focus:outline-none"
+                  />
+                </label>
+              </div>
             </div>
-            <label className="flex items-center gap-1 text-xs text-costco-blue-100">
-              予算 ¥
-              <input
-                type="number"
-                inputMode="numeric"
-                value={budgetInput}
-                onChange={(e) => setBudgetInput(e.target.value)}
-                onBlur={handleBudgetBlur}
-                className="w-20 border-b border-costco-blue-300 bg-transparent text-right text-white focus:outline-none"
-              />
-            </label>
+            {lastTripTotal !== null && (
+              <p className="mt-1 text-right text-xs text-costco-blue-100">
+                前回の購入額 ¥{lastTripTotal.toLocaleString()}
+              </p>
+            )}
           </div>
         )}
 
@@ -228,6 +263,8 @@ export function ListScreen({ onOpenCart }: Props) {
               <ul className="space-y-1.5">
                 {items.map((product) => {
                   const checked = isChecked(product.id)
+                  const consideringItem = consideringItemByProductId.get(product.id)
+                  const quantity = consideringItem?.quantity ?? 1
                   return (
                     <li
                       key={product.id}
@@ -255,8 +292,27 @@ export function ListScreen({ onOpenCart }: Props) {
                         </span>
                         <Pencil className="h-3 w-3 shrink-0 text-slate-300" />
                       </button>
+                      {checked && consideringItem && (
+                        <div className="flex shrink-0 items-center gap-1 rounded-lg bg-slate-100 p-0.5">
+                          <button
+                            onClick={() => updateCartItemQuantity(consideringItem.id, quantity - 1)}
+                            className="rounded bg-white p-1 shadow-sm active:bg-slate-200"
+                            aria-label="数量を減らす"
+                          >
+                            <Minus className="h-3.5 w-3.5 text-slate-700" />
+                          </button>
+                          <span className="w-5 text-center text-xs font-bold text-slate-800">{quantity}</span>
+                          <button
+                            onClick={() => updateCartItemQuantity(consideringItem.id, quantity + 1)}
+                            className="rounded bg-white p-1 shadow-sm active:bg-slate-200"
+                            aria-label="数量を増やす"
+                          >
+                            <Plus className="h-3.5 w-3.5 text-slate-700" />
+                          </button>
+                        </div>
+                      )}
                       <span className="shrink-0 text-xs text-slate-400">
-                        ¥{(product.defaultPrice ?? 0).toLocaleString()}
+                        ¥{((product.defaultPrice ?? 0) * (checked ? quantity : 1)).toLocaleString()}
                       </span>
                     </li>
                   )
