@@ -40,6 +40,7 @@ export function BarcodeScanSheet({ existingProducts, onClose, onSubmit }: Props)
   const [phase, setPhase] = useState<Phase>('scanning')
   const [barcode, setBarcode] = useState('')
   const [lookupNote, setLookupNote] = useState<string | null>(null)
+  const [lookupMatched, setLookupMatched] = useState(false)
 
   const [name, setName] = useState('')
   const [category, setCategory] = useState('')
@@ -90,6 +91,7 @@ export function BarcodeScanSheet({ existingProducts, onClose, onSubmit }: Props)
       setPrice(history.price !== null ? String(history.price) : '')
       setAmount(history.amount !== null ? String(history.amount) : '')
       setUnit(history.unit ?? '')
+      setLookupMatched(true)
       setLookupNote('前回スキャンした内容を呼び出しました。内容が変わっていれば修正してください。')
       setPhase('confirming')
       return
@@ -101,13 +103,16 @@ export function BarcodeScanSheet({ existingProducts, onClose, onSubmit }: Props)
       setName(offResult.name)
       setAmount(offResult.amount !== null ? String(offResult.amount) : '')
       setUnit(offResult.unit ?? '')
+      setLookupMatched(true)
       setLookupNote('Open Food Factsから商品名を取得しました。価格などは手入力してください。')
       setPhase('confirming')
       return
     }
 
-    // ③見つからなければ手入力
-    setLookupNote(null)
+    // ③見つからなければ手入力(「なぜ何も反映されないのか」が分からず
+    // 不安にならないよう、見つからなかったことをはっきり伝える)
+    setLookupMatched(false)
+    setLookupNote('一致する商品情報が見つかりませんでした。商品名・価格を入力してください。')
     setPhase('confirming')
   }
 
@@ -179,7 +184,13 @@ export function BarcodeScanSheet({ existingProducts, onClose, onSubmit }: Props)
       {phase === 'confirming' && (
         <div className="flex-1 overflow-y-auto bg-white p-5">
           {lookupNote && (
-            <p className="mb-4 rounded-lg bg-costco-blue-50 px-3 py-2 text-xs text-costco-blue-700">{lookupNote}</p>
+            <p
+              className={`mb-4 rounded-lg px-3 py-2 text-xs ${
+                lookupMatched ? 'bg-costco-blue-50 text-costco-blue-700' : 'bg-slate-100 text-slate-500'
+              }`}
+            >
+              {lookupNote}
+            </p>
           )}
           <p className="mb-3 text-xs text-slate-400">バーコード: {barcode}</p>
 
