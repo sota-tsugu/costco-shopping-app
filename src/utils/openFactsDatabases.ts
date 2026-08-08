@@ -42,11 +42,15 @@ function parseQuantity(quantity: string | undefined): { amount: number | null; u
  * 「Open ... Facts」系サイトのうち指定したドメインへ、バーコード番号で
  * 商品情報を問い合わせる共通処理。見つからない場合・通信エラーの場合は
  * nullを返す(呼び出し側は次の候補、最終的には手入力にフォールバックする)
+ *
+ * `lc=ja`を指定することで、日本語の商品名が登録されていればそちらを
+ * 優先して受け取れる(登録が無ければ、元々登録されている言語のまま返る。
+ * 自動翻訳ではなく、あくまで「日本語の登録があれば使う」という仕組み)
  */
 async function fetchFromOpenFactsSite(domain: string, barcode: string): Promise<OpenFactsResult | null> {
   try {
     const response = await fetch(
-      `https://${domain}/api/v2/product/${encodeURIComponent(barcode)}.json?fields=product_name,quantity`,
+      `https://${domain}/api/v2/product/${encodeURIComponent(barcode)}.json?fields=product_name,quantity&lc=ja`,
     )
     if (!response.ok) return null
     const data = await response.json()
