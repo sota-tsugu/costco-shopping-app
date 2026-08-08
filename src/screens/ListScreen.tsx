@@ -183,7 +183,7 @@ export function ListScreen({ onOpenCart }: Props) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-8">
+    <div className={`min-h-screen bg-slate-50 ${isPlanning && products.length > 0 ? 'pb-28' : 'pb-8'}`}>
       <header className="bg-costco-blue-700 px-4 pb-4 pt-4 text-white shadow-md">
         <TricolorAccent />
         <div className="mt-3 flex items-center justify-between">
