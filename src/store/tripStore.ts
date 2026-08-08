@@ -93,6 +93,8 @@ type TripStoreState = {
     updates: { name: string; category: string | null; price: number | null; amount: number | null; unit: string | null },
   ) => Promise<void>
   removeProduct: (productId: string) => Promise<void>
+  /** 定番商品リストを一括で空にする(設定画面から使う、元に戻せない操作) */
+  clearAllProducts: () => Promise<void>
 
   /** 「planning」中のトリップが無ければ新しく作る。あれば何もしない */
   ensurePlanningTrip: (budget: number) => Promise<void>
@@ -259,6 +261,17 @@ export const useTripStore = create<TripStoreState>((set, get) => ({
     await deleteDoc(doc(householdCollection(householdId, 'products'), productId))
   },
 
+  async clearAllProducts() {
+    const { products } = get()
+    if (products.length === 0) return
+    const householdId = requireHouseholdId()
+    const batch = writeBatch(db)
+    for (const product of products) {
+      batch.delete(doc(householdCollection(householdId, 'products'), product.id))
+    }
+    await batch.commit()
+  },
+
   async ensurePlanningTrip(budget) {
     const { currentTrip } = get()
     if (currentTrip) return
@@ -393,15 +406,23 @@ export const useTripStore = create<TripStoreState>((set, get) => ({
   },
 }))
 
-/** 商品ごとの直近の購入記録をまとめて取得する(価格・内容量・単位の初期値提案に使う) */
+/**
+ * 商品ごとの直近の購入記録をまとめて取得する(価格・内容量・単位の初期値提案に使う)。
+ *
+ * 商品id(productId)ではなく商品名(productName)で照合している。理由:
+ * 「定番商品リストを空にする」機能で商品を削除して登録し直すと、
+ * Firestore上のidは新しく採番され直すため、idで照合すると過去の
+ * 購入記録との結びつきが切れてしまう。商品名であれば、削除・登録し
+ * 直した後も同じ名前である限り過去の記録と正しく結びつく
+ */
 export async function fetchLatestPurchaseByProduct(
-  productId: string,
+  productName: string,
 ): Promise<{ price: number; amount: number | null; unit: string | null } | null> {
   const householdId = requireHouseholdId()
   const snapshot = await getDocs(
     query(
       householdCollection(householdId, 'tripItems'),
-      where('productId', '==', productId),
+      where('productName', '==', productName),
       where('status', '==', 'purchased'),
     ),
   )
@@ -417,8 +438,14 @@ export async function fetchLatestPurchaseByProduct(
 }
 
 /**
- * 直近に完了した買い物トリップで、実際に購入済みだった商品のidをまとめて
- * 取得する。「前回買ったものを反映」ボタンから使う。
+ * 直近に完了した買い物トリップで、実際に購入済みだった商品の名前を
+ * まとめて取得する。「前回買ったものを反映」ボタンから使う。
+ *
+ * 商品id(productId)ではなく商品名(productName)を返している。理由:
+ * 「定番商品リストを空にする」機能で商品を削除して登録し直すと、
+ * Firestore上のidは新しく採番され直すため、idで照合すると「前回買った
+ * もの」が定番商品リスト上で見つからなくなってしまう。商品名であれば、
+ * 削除・登録し直した後も同じ名前で登録すれば正しく反映できる
  *
  * Firestoreの複合インデックス(status==completedで絞り込みつつ
  * completedAtで並べ替える、という組み合わせ)を新たに作らずに済むよう、
@@ -426,7 +453,7 @@ export async function fetchLatestPurchaseByProduct(
  * 選んでいる(家庭利用の範囲では件数が少ないため、パフォーマンス上の
  * 問題にはならない想定)。
  */
-export async function fetchLastCompletedTripProductIds(): Promise<string[]> {
+export async function fetchLastCompletedTripProductNames(): Promise<string[]> {
   const householdId = requireHouseholdId()
   const tripsSnapshot = await getDocs(
     query(householdCollection(householdId, 'shoppingTrips'), where('status', '==', 'completed')),
@@ -444,10 +471,8 @@ export async function fetchLastCompletedTripProductIds(): Promise<string[]> {
       where('status', '==', 'purchased'),
     ),
   )
-  const productIds = itemsSnapshot.docs
-    .map((d) => d.data().productId as string | null)
-    .filter((id): id is string => id !== null)
-  return [...new Set(productIds)]
+  const productNames = itemsSnapshot.docs.map((d) => d.data().productName as string)
+  return [...new Set(productNames)]
 }
 
 /**

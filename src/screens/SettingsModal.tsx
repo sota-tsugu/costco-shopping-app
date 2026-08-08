@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { X, RefreshCw, Loader2, Users, Copy, Check, LogOut } from 'lucide-react'
+import { X, RefreshCw, Loader2, Users, Copy, Check, LogOut, Trash2 } from 'lucide-react'
 import { forceUpdateApp } from '../utils/appUpdate'
 import { forgetHousehold, getSavedHouseholdId } from '../firebase/household'
+import { useTripStore } from '../store/tripStore'
 
 // アプリの設定画面(モーダル)。
 // 「アプリを最新の状態に更新する」ボタンと、この端末が今どの家族コードに
@@ -19,7 +20,10 @@ type Props = {
 export function SettingsModal({ onClose }: Props) {
   const [isUpdating, setIsUpdating] = useState(false)
   const [isCopied, setIsCopied] = useState(false)
+  const [isClearingProducts, setIsClearingProducts] = useState(false)
   const householdId = getSavedHouseholdId()
+  const products = useTripStore((state) => state.products)
+  const clearAllProducts = useTripStore((state) => state.clearAllProducts)
 
   async function handleUpdate() {
     setIsUpdating(true)
@@ -39,6 +43,24 @@ export function SettingsModal({ onClose }: Props) {
     setTimeout(() => setIsCopied(false), 2000)
   }
 
+  async function handleClearAllProducts() {
+    if (products.length === 0) {
+      window.alert('定番商品リストにはまだ何も登録されていません。')
+      return
+    }
+    const confirmed = window.confirm(
+      `定番商品リストの${products.length}件をすべて削除しますか?(元に戻せません)\n\n` +
+        'これまでの購入履歴は別に保存されているため、削除しても消えません。',
+    )
+    if (!confirmed) return
+    setIsClearingProducts(true)
+    try {
+      await clearAllProducts()
+    } finally {
+      setIsClearingProducts(false)
+    }
+  }
+
   function handleSwitchHousehold() {
     const confirmed = window.confirm(
       'この端末を今の家族コードから切り離して、最初の画面(家族を作る/参加する)に戻ります。' +
@@ -52,7 +74,7 @@ export function SettingsModal({ onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-30 flex items-end justify-center bg-black/40 sm:items-center">
-      <div className="w-full max-w-sm rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-2xl">
+      <div className="max-h-[85vh] w-full max-w-sm overflow-y-auto rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-2xl">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-base font-bold text-slate-800">設定</h2>
           <button onClick={onClose} className="rounded-full p-1 text-slate-400 hover:bg-slate-100">
@@ -107,6 +129,23 @@ export function SettingsModal({ onClose }: Props) {
               <RefreshCw className="h-5 w-5" />
             )}
             {isUpdating ? '更新しています…' : 'アプリを最新の状態に更新する'}
+          </button>
+        </div>
+
+        <div className="mt-4 rounded-lg border border-red-100 bg-red-50 p-4">
+          <p className="mb-3 text-sm text-slate-600">
+            定番商品リスト(現在{products.length}件)を一括で空にします。登録し直すまで「今回買うものリスト」に何も出てこなくなります。
+          </p>
+          <p className="mb-3 text-xs text-slate-400">
+            これまでの購入履歴は別に保存されているため、消えません。ただし空にした後に登録し直した商品は、新しい商品として扱われます。
+          </p>
+          <button
+            onClick={handleClearAllProducts}
+            disabled={isClearingProducts}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-red-300 px-4 py-2.5 text-sm font-medium text-red-600 disabled:opacity-50"
+          >
+            <Trash2 className="h-4 w-4" />
+            {isClearingProducts ? '削除しています…' : '定番商品リストを空にする'}
           </button>
         </div>
       </div>

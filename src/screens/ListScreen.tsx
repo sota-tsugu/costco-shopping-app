@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Plus, Check, ChevronRight, Settings, ShoppingCart, X, Search, Minus, Trash2, Pencil, History } from 'lucide-react'
 import {
   useTripStore,
-  fetchLastCompletedTripProductIds,
+  fetchLastCompletedTripProductNames,
   fetchLastCompletedTripTotal,
   type Product,
   type TripItem,
@@ -166,12 +166,14 @@ export function ListScreen({ onOpenCart }: Props) {
   async function handleOpenApplyLastTrip() {
     setIsApplyingLastTrip(true)
     try {
-      const productIds = await fetchLastCompletedTripProductIds()
-      if (productIds.length === 0) {
+      const productNames = await fetchLastCompletedTripProductNames()
+      if (productNames.length === 0) {
         window.alert('前回の買い物履歴がまだありません。')
         return
       }
-      const candidates = products.filter((p) => productIds.includes(p.id))
+      // idではなく商品名で照合する(定番商品を削除して登録し直した場合も
+      // 同じ名前であれば正しく反映できるようにするため)
+      const candidates = products.filter((p) => productNames.includes(p.name))
       if (candidates.length === 0) {
         window.alert('前回購入した商品が、現在の定番商品リストに見つかりませんでした。')
         return
