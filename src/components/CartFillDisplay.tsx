@@ -40,8 +40,9 @@ const ITEMS_PER_ROW = 5
 const ROW_STEP = 0.16
 // 一番下の行の基準位置。1.0(バスケットの底のライン)ぴったりにすると、
 // 商品の絵文字の下半分がカゴの底を突き抜けて見えてしまうため、少し
-// 手前(小さい値)に余白を持たせている
-const V_BOTTOM = 0.88
+// 手前(小さい値)に余白を持たせている。「山盛りで賑やかに見える」ことを
+// 優先し、余白は最小限に留めている
+const V_BOTTOM = 0.94
 
 // 山盛りが上に伸びていく高さの天井(画像内でのtop位置、%)。件数自体には
 // 上限を設けないが(仕様通り)、見た目の高さには天井を設け、画面上部の
@@ -99,8 +100,9 @@ function computeItemStyle(index: number): ItemStyle {
   let u = (col + 0.5) / ITEMS_PER_ROW + (r2 - 0.5) * 0.34
   // 左右の端ぎりぎり(0や1に近い位置)だと、商品の絵文字の左右端が
   // 網目の外(白い背景側)に突き抜けて見えてしまうため、両端に余白を
-  // 持たせている(底の突き抜け対策(V_BOTTOM)と同じ考え方)
-  u = Math.min(Math.max(u, 0.12), 0.88)
+  // 持たせている(底の突き抜け対策(V_BOTTOM)と同じ考え方)。
+  // 「山盛りで賑やかに見える」ことを優先し、余白は最小限に留めている
+  u = Math.min(Math.max(u, 0.06), 0.94)
 
   // 天井(MOUND_CEILING_PERCENT)を超える高さになる分は、そのまま上に
   // 伸ばさず、天井付近の帯(MOUND_CEILING_BAND_PERCENT)にランダムに
@@ -152,7 +154,7 @@ export function CartFillDisplay({ itemCount }: Props) {
             <span
               style={{
                 display: 'inline-block',
-                fontSize: '9cqw',
+                fontSize: '10.8cqw',
                 lineHeight: 1,
                 transform: `scale(${item.scale}) rotate(${item.rotateDeg}deg)`,
               }}
