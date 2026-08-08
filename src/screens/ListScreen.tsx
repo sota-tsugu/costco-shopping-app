@@ -50,6 +50,7 @@ export function ListScreen({ onOpenCart }: Props) {
   const [isApplyingLastTrip, setIsApplyingLastTrip] = useState(false)
   const [lastTripCandidates, setLastTripCandidates] = useState<Product[] | null>(null)
   const [lastTripTotal, setLastTripTotal] = useState<number | null>(null)
+  const [isPlanRecapOpen, setIsPlanRecapOpen] = useState(false)
 
   // トリップが無ければ、初期予算3万円でplanningトリップを自動的に作る
   // (以前のアプリと同様、毎回同じようなものを買う前提で「まず一覧が
@@ -149,6 +150,11 @@ export function ListScreen({ onOpenCart }: Props) {
     return names.map((category) => ({ category, items: groups.get(category)! }))
   }, [tripItems])
 
+  // 「計画を見る」シートに表示する、計画由来(source: 'planned')の商品一覧。
+  // 買い物中に削除した商品はtripItem自体が消えるため、この一覧には
+  // 出てこなくなる(計画時点の完全な記録ではなく、簡易的な参考表示)
+  const plannedItems = useMemo(() => tripItems.filter((item) => item.source === 'planned'), [tripItems])
+
   async function handleStartShopping() {
     await startShopping()
   }
@@ -222,23 +228,34 @@ export function ListScreen({ onOpenCart }: Props) {
         )}
 
         {isActive && (
-          <button
-            onClick={onOpenCart}
-            className="mt-3 flex w-full items-center justify-between rounded-xl bg-costco-blue-600 px-3 py-2 transition-colors active:bg-costco-blue-800"
-          >
-            <span className="flex items-center gap-1.5 text-sm">
-              <ShoppingCart className="h-4 w-4" />
-              カート {cartCount}点
-            </span>
-            <span className="flex items-center gap-1 text-base font-semibold">
-              ¥{cartTotal.toLocaleString()}
-              <ChevronRight className="h-4 w-4" />
-            </span>
-          </button>
+          <div className="mt-3">
+            <button
+              onClick={onOpenCart}
+              className="flex w-full items-center justify-between rounded-xl bg-costco-blue-600 px-3 py-2 transition-colors active:bg-costco-blue-800"
+            >
+              <span className="flex items-center gap-1.5 text-sm">
+                <ShoppingCart className="h-4 w-4" />
+                カート {cartCount}点
+              </span>
+              <span className="flex items-center gap-1 text-base font-semibold">
+                ¥{cartTotal.toLocaleString()}
+                <ChevronRight className="h-4 w-4" />
+              </span>
+            </button>
+            {currentTrip && (
+              <button
+                onClick={() => setIsPlanRecapOpen(true)}
+                className="mt-1.5 flex w-full items-center justify-between px-1 text-xs text-costco-blue-100 active:text-white"
+              >
+                <span>予算 ¥{currentTrip.budget.toLocaleString()}</span>
+                <span className="underline underline-offset-2">計画を見る</span>
+              </button>
+            )}
+          </div>
         )}
       </header>
 
-      <main className="mx-auto max-w-md px-4 py-4">
+      <main key={isActive ? 'active' : 'planning'} className="screen-fade-in mx-auto max-w-md px-4 py-4">
         {isPlanning && products.length > 0 && (
           <button
             onClick={handleOpenApplyLastTrip}
@@ -463,6 +480,10 @@ export function ListScreen({ onOpenCart }: Props) {
             setLastTripCandidates(null)
           }}
         />
+      )}
+
+      {isPlanRecapOpen && currentTrip && (
+        <PlanRecapSheet budget={currentTrip.budget} items={plannedItems} onClose={() => setIsPlanRecapOpen(false)} />
       )}
 
       {isSettingsOpen && <SettingsModal onClose={() => setIsSettingsOpen(false)} />}
@@ -856,6 +877,54 @@ function ApplyLastTripSheet({ candidates, onClose, onSubmit }: ApplyLastTripShee
         >
           {selectedIds.size}件を反映する
         </button>
+      </div>
+    </div>
+  )
+}
+
+type PlanRecapSheetProps = {
+  budget: number
+  /** 計画由来(source: 'planned')のtripItem。買い物中に削除した商品は
+   * データごと消えているため出てこない(簡易的な参考表示) */
+  items: TripItem[]
+  onClose: () => void
+}
+
+/** 買い物中に、計画時点の内容(予算・選んでいた商品)を振り返るための
+ * 読み取り専用シート。買い物中の画面のヘッダーにある「計画を見る」から開く。
+ * リストを常時長くしないよう、必要な時だけタップして確認する形にしている */
+function PlanRecapSheet({ budget, items, onClose }: PlanRecapSheetProps) {
+  return (
+    <div className="fixed inset-0 z-20 flex items-end justify-center bg-black/40 sm:items-center">
+      <div className="flex max-h-[80vh] w-full max-w-sm flex-col rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-2xl">
+        <div className="mb-1 flex items-center justify-between">
+          <h2 className="text-base font-bold text-slate-800">計画を見る</h2>
+          <button onClick={onClose} className="rounded-full p-1 text-slate-400 hover:bg-slate-100">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <p className="mb-3 text-xs text-slate-400">買い物前に決めた予算と、選んでいた商品です。</p>
+
+        <div className="mb-4 rounded-xl bg-slate-50 px-3 py-2.5">
+          <span className="text-xs text-slate-500">予算</span>
+          <div className="text-xl font-semibold text-slate-800">¥{budget.toLocaleString()}</div>
+        </div>
+
+        {items.length === 0 ? (
+          <p className="mb-2 text-sm text-slate-400">計画時に選んでいた商品はありません。</p>
+        ) : (
+          <ul className="mb-2 flex-1 space-y-1.5 overflow-y-auto">
+            {items.map((item) => (
+              <li
+                key={item.id}
+                className="flex items-center justify-between gap-2 rounded-xl bg-slate-50 px-3 py-2 text-sm"
+              >
+                <span className="min-w-0 flex-1 truncate text-slate-700">{item.productName}</span>
+                <span className="shrink-0 text-xs text-slate-400">数量 {item.quantity}</span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   )
