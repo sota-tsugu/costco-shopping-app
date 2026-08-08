@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import cartImage from '../assets/cart-icon.jpg'
+import cartFrontMesh from '../assets/cart-icon-front.png'
 
 // カート写真(cart-icon.jpg)の中に、カート内商品の点数ぶん絵文字を
 // ランダムに敷き詰めて表示する。写真(746x700px)を実際に計測して求めた、
@@ -15,6 +16,15 @@ import cartImage from '../assets/cart-icon.jpg'
 //
 // mcp visualizeツールでプロトタイプを作り、SOTAさんと確認した配置ロジックを
 // そのまま実装している(costco_app_concept_v3.mdの「画面B」を参照)
+//
+// 【カゴの網目を商品より手前に見せる工夫】
+// 絵文字をそのままカート写真の上に重ねると、商品がカゴの網目より前面に
+// 出てしまい、「カゴの中に入っている」ようには見えない(SOTAさんの
+// フィードバックで判明)。そこで、cart-icon.jpgの白背景を透明化した
+// cart-icon-front.png(このファイルと同じ内容だが背景だけ透明)を
+// 用意し、バスケット内側の範囲(台形)だけを切り抜いて、絵文字の
+// さらに上に重ねている。網目の線がある部分は不透明(商品を隠す)、
+// 線が無い隙間は透明(商品が見える)ため、商品が網目の奥にあるように見える
 
 const BASKET_TOP_LEFT: [number, number] = [0.0268, 0.2357]
 const BASKET_TOP_RIGHT: [number, number] = [0.7909, 0.0929]
@@ -84,6 +94,12 @@ function computeItemStyle(index: number): ItemStyle {
   }
 }
 
+// バスケット内側の台形部分だけを切り抜くためのclip-path(%指定)。
+// 商品の配置に使っているBASKET_TOP_LEFT等と同じ4点を使う
+const BASKET_CLIP_PATH = `polygon(${[BASKET_TOP_LEFT, BASKET_TOP_RIGHT, BASKET_BOTTOM_RIGHT, BASKET_BOTTOM_LEFT]
+  .map(([x, y]) => `${(x * 100).toFixed(2)}% ${(y * 100).toFixed(2)}%`)
+  .join(', ')})`
+
 type Props = {
   /** カートに入っている商品の点数(数量の合計) */
   itemCount: number
@@ -119,6 +135,13 @@ export function CartFillDisplay({ itemCount }: Props) {
           </span>
         ))}
       </div>
+      <img
+        src={cartFrontMesh}
+        alt=""
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 h-full w-full"
+        style={{ clipPath: BASKET_CLIP_PATH }}
+      />
     </div>
   )
 }
