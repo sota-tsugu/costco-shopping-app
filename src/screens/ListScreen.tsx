@@ -91,7 +91,12 @@ export function ListScreen({ onOpenCart }: Props) {
       .filter((item) => item.status === 'inCart')
       .reduce((sum, item) => sum + (item.price ?? 0) * item.quantity, 0)
   }, [tripItems])
-  const cartCount = tripItems.filter((item) => item.status === 'inCart').length
+  // 画面B(カート)の点数表示と揃えるため、行数ではなく数量の合計を数える
+  // (以前は行数のみを数えていたため、同じ商品の数量を増やしても点数が
+  // 変わらない不具合があった)
+  const cartCount = tripItems
+    .filter((item) => item.status === 'inCart')
+    .reduce((sum, item) => sum + item.quantity, 0)
 
   const groupedProducts = useMemo(() => {
     const groups = new Map<string, Product[]>()
