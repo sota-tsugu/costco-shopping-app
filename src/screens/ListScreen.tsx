@@ -224,7 +224,7 @@ export function ListScreen({ onOpenCart }: Props) {
         {isActive && (
           <button
             onClick={onOpenCart}
-            className="mt-3 flex w-full items-center justify-between rounded-xl bg-costco-blue-600 px-3 py-2"
+            className="mt-3 flex w-full items-center justify-between rounded-xl bg-costco-blue-600 px-3 py-2 transition-colors active:bg-costco-blue-800"
           >
             <span className="flex items-center gap-1.5 text-sm">
               <ShoppingCart className="h-4 w-4" />
