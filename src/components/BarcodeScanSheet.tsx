@@ -59,6 +59,21 @@ export function BarcodeScanSheet({ existingProducts, onClose, onSubmit }: Props)
   const [quantity, setQuantity] = useState('1')
   const [isSaving, setIsSaving] = useState(false)
 
+  // カメラを確実に止めるための処理。stop()を呼んでいてもcontrolsRefへの
+  // 反映が(タイミング的に)間に合っていない場合に備え、video要素に
+  // つながっているカメラの映像ストリーム(MediaStreamTrack)を直接止める
+  // 処理も合わせて行う。これを怠ると、シートを閉じた後もカメラが
+  // 裏側で動き続けてしまう(SOTAさんのフィードバックで判明した不具合)
+  function stopCamera() {
+    controlsRef.current?.stop()
+    controlsRef.current = null
+    const stream = videoRef.current?.srcObject
+    if (stream instanceof MediaStream) {
+      stream.getTracks().forEach((track) => track.stop())
+      if (videoRef.current) videoRef.current.srcObject = null
+    }
+  }
+
   useEffect(() => {
     if (phase !== 'scanning') return
     let cancelled = false
@@ -72,21 +87,34 @@ export function BarcodeScanSheet({ existingProducts, onClose, onSubmit }: Props)
           controlsRef.current = controls
           if (result && !cancelled) {
             cancelled = true
-            controls.stop()
+            stopCamera()
             void handleDecoded(result.getText())
           }
         },
       )
+      .then((controls) => {
+        // 1フレーム目のコールバックが呼ばれる前に閉じられた場合に備え、
+        // Promiseの解決時点でもcontrolsを取得しておく
+        controlsRef.current = controls
+        if (cancelled) stopCamera()
+      })
       .catch(() => {
         if (!cancelled) setPhase('camera-error')
       })
 
     return () => {
       cancelled = true
-      controlsRef.current?.stop()
+      stopCamera()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase])
+
+  // シート自体がアンマウントされる時(バーコードスキャン以外の理由での
+  // クローズも含む)にも、念のためカメラを止める
+  useEffect(() => {
+    return () => stopCamera()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function handleDecoded(code: string) {
     setBarcode(code)
