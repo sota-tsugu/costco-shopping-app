@@ -522,3 +522,38 @@ export async function fetchTripItemByBarcode(barcode: string): Promise<{
     .sort((a, b) => (a.createdAt > b.createdAt ? -1 : 1))
   return rows[0] ?? null
 }
+
+export type ProductPurchaseRecord = {
+  price: number
+  amount: number | null
+  unit: string | null
+  quantity: number
+  /** 購入日時(会計完了時にセットされるaddedToCartAtを使う) */
+  purchasedAt: string
+}
+
+/**
+ * ある商品(商品名で指定)の、過去の購入記録をすべて取得する。
+ * 商品詳細シート(単価比較・購入履歴・購入頻度)で使う。
+ * idではなく商品名で照合している理由は、fetchLastCompletedTripProductNamesの
+ * コメントを参照(定番商品リストを空にして登録し直しても結びつくようにするため)
+ */
+export async function fetchPurchaseHistoryByProductName(productName: string): Promise<ProductPurchaseRecord[]> {
+  const householdId = requireHouseholdId()
+  const snapshot = await getDocs(
+    query(
+      householdCollection(householdId, 'tripItems'),
+      where('productName', '==', productName),
+      where('status', '==', 'purchased'),
+    ),
+  )
+  return snapshot.docs
+    .map((d) => ({
+      price: d.data().price as number,
+      amount: (d.data().amount ?? null) as number | null,
+      unit: (d.data().unit ?? null) as string | null,
+      quantity: (d.data().quantity ?? 1) as number,
+      purchasedAt: (d.data().addedToCartAt ?? d.data().createdAt ?? '') as string,
+    }))
+    .sort((a, b) => (a.purchasedAt > b.purchasedAt ? -1 : 1))
+}

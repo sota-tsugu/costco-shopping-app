@@ -9,6 +9,7 @@ import {
 } from '../store/tripStore'
 import { SettingsModal } from './SettingsModal'
 import { TricolorAccent } from '../components/TricolorAccent'
+import { ProductHistorySheet } from '../components/ProductHistorySheet'
 import { PRODUCT_CATALOG } from '../data/productCatalog'
 
 // 画面A:今回買うものリスト画面。
@@ -51,6 +52,7 @@ export function ListScreen({ onOpenCart }: Props) {
   const [lastTripCandidates, setLastTripCandidates] = useState<Product[] | null>(null)
   const [lastTripTotal, setLastTripTotal] = useState<number | null>(null)
   const [isPlanRecapOpen, setIsPlanRecapOpen] = useState(false)
+  const [historyProductName, setHistoryProductName] = useState<string | null>(null)
 
   // トリップが無ければ、初期予算3万円でplanningトリップを自動的に作る
   // (以前のアプリと同様、毎回同じようなものを買う前提で「まず一覧が
@@ -365,7 +367,12 @@ export function ListScreen({ onOpenCart }: Props) {
                     className="flex items-center gap-2 rounded-xl bg-white px-3 py-2.5 shadow-sm"
                   >
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm text-slate-800">{item.productName}</div>
+                      <button
+                        onClick={() => setHistoryProductName(item.productName)}
+                        className="max-w-full truncate text-left text-sm text-slate-800 underline decoration-slate-300 underline-offset-2"
+                      >
+                        {item.productName}
+                      </button>
                       <span
                         className={`mt-0.5 inline-block rounded-full px-2 py-0.5 text-[10px] font-medium ${
                           item.status === 'considering'
@@ -500,6 +507,10 @@ export function ListScreen({ onOpenCart }: Props) {
 
       {isPlanRecapOpen && currentTrip && (
         <PlanRecapSheet budget={currentTrip.budget} items={plannedItems} onClose={() => setIsPlanRecapOpen(false)} />
+      )}
+
+      {historyProductName && (
+        <ProductHistorySheet productName={historyProductName} onClose={() => setHistoryProductName(null)} />
       )}
 
       {isSettingsOpen && <SettingsModal onClose={() => setIsSettingsOpen(false)} />}
