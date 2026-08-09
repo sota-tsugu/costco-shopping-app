@@ -11,7 +11,7 @@ import {
   Trash2,
   Pencil,
   History,
-  BarChart3,
+  ReceiptJapaneseYen,
 } from 'lucide-react'
 import {
   useTripStore,
@@ -267,7 +267,7 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
               className="rounded-full p-1 text-costco-blue-100 transition-colors hover:bg-costco-blue-600"
               aria-label="購入履歴・レポート"
             >
-              <BarChart3 className="h-5 w-5" />
+              <ReceiptJapaneseYen className="h-5 w-5" />
             </button>
             <button
               onClick={() => setIsSettingsOpen(true)}
