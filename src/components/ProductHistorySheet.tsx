@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { X, TrendingUp, TrendingDown, Minus, Pencil, Trash2 } from 'lucide-react'
 import { useTripStore, fetchPurchaseHistoryByProductName, type ProductPurchaseRecord } from '../store/tripStore'
 import { LineChart, formatYen, type LineChartPoint } from './LineChart'
+import { toDigitsOnly, formatWithCommas } from '../utils/numberInput'
 
 // 商品ごとの詳細シート:単価比較・購入履歴・購入頻度を表示する。
 // 画面Aの買い物中(active)リストで商品名をタップすると開く
@@ -287,10 +288,10 @@ function EditPurchaseRecordSheet({ record, onClose, onSaved }: EditPurchaseRecor
 
         <label className="mb-1 block text-xs font-medium text-slate-500">価格(円)</label>
         <input
-          type="number"
+          type="text"
           inputMode="numeric"
-          value={price}
-          onChange={(e) => setPrice(e.target.value)}
+          value={formatWithCommas(price)}
+          onChange={(e) => setPrice(toDigitsOnly(e.target.value))}
           className="mb-4 w-full rounded-lg border border-slate-300 px-3 py-3 text-base focus:border-costco-blue-500 focus:outline-none"
         />
 

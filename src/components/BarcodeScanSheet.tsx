@@ -7,6 +7,7 @@ import {
   fetchOpenProductsFactsProduct,
   fetchOpenBeautyFactsProduct,
 } from '../utils/openFactsDatabases'
+import { toDigitsOnly, formatWithCommas } from '../utils/numberInput'
 
 // バーコードスキャンで、計画リストに無かった商品をその場で追加するための
 // フルスクリーンシート。カメラでバーコードを読み取ったら、次の順番で
@@ -268,10 +269,10 @@ export function BarcodeScanSheet({ existingProducts, onClose, onSubmit }: Props)
 
           <label className="mb-1 block text-xs font-medium text-slate-500">価格(円)</label>
           <input
-            type="number"
+            type="text"
             inputMode="numeric"
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
+            value={formatWithCommas(price)}
+            onChange={(e) => setPrice(toDigitsOnly(e.target.value))}
             placeholder="例:980"
             className="mb-4 w-full rounded-lg border border-slate-300 px-3 py-3 text-base focus:border-costco-blue-500 focus:outline-none"
           />

@@ -26,6 +26,7 @@ import { ProductHistorySheet } from '../components/ProductHistorySheet'
 import { TripStageIndicator } from '../components/TripStageIndicator'
 import { ScreenPageDots } from '../components/ScreenPageDots'
 import { PRODUCT_CATALOG } from '../data/productCatalog'
+import { toDigitsOnly, formatWithCommas } from '../utils/numberInput'
 
 // 画面A:今回買うものリスト画面。
 // 買い物前の計画(定番商品リストから選ぶ・予算設定)から、店内での進行管理
@@ -290,10 +291,10 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
                 <label className="flex items-center gap-1 text-xl font-semibold">
                   ¥
                   <input
-                    type="number"
+                    type="text"
                     inputMode="numeric"
-                    value={budgetInput}
-                    onChange={(e) => setBudgetInput(e.target.value)}
+                    value={formatWithCommas(budgetInput)}
+                    onChange={(e) => setBudgetInput(toDigitsOnly(e.target.value))}
                     onBlur={handleBudgetBlur}
                     className="w-24 border-b border-costco-blue-300 bg-transparent text-right text-xl font-semibold text-white focus:outline-none"
                   />
@@ -754,11 +755,11 @@ function AddProductSheet({ existingProducts, onClose, onSubmit }: AddProductShee
 
         <label className="mb-1 block text-xs font-medium text-slate-500">価格(円・任意)</label>
         <input
-          type="number"
+          type="text"
           inputMode="numeric"
-          value={price}
-          onChange={(e) => setPrice(e.target.value)}
-          placeholder="例:1580"
+          value={formatWithCommas(price)}
+          onChange={(e) => setPrice(toDigitsOnly(e.target.value))}
+          placeholder="例:1,580"
           className="mb-4 w-full rounded-lg border border-slate-300 px-3 py-3 text-base focus:border-costco-blue-500 focus:outline-none"
         />
 
@@ -892,10 +893,10 @@ function EditProductSheet({ product, existingProducts, onClose, onSubmit, onDele
 
         <label className="mb-1 block text-xs font-medium text-slate-500">価格(円・任意)</label>
         <input
-          type="number"
+          type="text"
           inputMode="numeric"
-          value={price}
-          onChange={(e) => setPrice(e.target.value)}
+          value={formatWithCommas(price)}
+          onChange={(e) => setPrice(toDigitsOnly(e.target.value))}
           className="mb-4 w-full rounded-lg border border-slate-300 px-3 py-3 text-base focus:border-costco-blue-500 focus:outline-none"
         />
 
