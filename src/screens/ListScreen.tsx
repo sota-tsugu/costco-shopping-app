@@ -115,6 +115,16 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
     return consideringProductIds.has(productId)
   }
 
+  // バーコードスキャンで追加した商品(定番商品リストに無い、productIdが
+  // 無いもの)。計画中の画面はもともと定番商品リストのチェックリスト
+  // として作っていたため、この種の商品を表示する場所が無かった
+  // (買い物中から計画中の画面に戻れるようにした際に判明した既知の段差)。
+  // 別枠の一覧として、計画中の画面にも表示・数量変更・削除できるようにする
+  const scannedItems = useMemo(
+    () => tripItems.filter((item) => item.source === 'scan'),
+    [tripItems],
+  )
+
   // 計画中(planning)は、直近に完了した買い物の合計額を「前回の購入額」
   // として表示する(予算を決める際の目安になるように)。トリップが
   // 切り替わるたび(新しい買い物を始めるたび)に最新の値を取り直す
@@ -135,12 +145,15 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
   }
 
   const estimatedTotal = useMemo(() => {
-    return products.reduce((sum, p) => {
+    const catalogTotal = products.reduce((sum, p) => {
       const item = consideringItemByProductId.get(p.id)
       if (!item) return sum
       return sum + (p.defaultPrice ?? 0) * item.quantity
     }, 0)
-  }, [products, consideringItemByProductId])
+    // スキャンした商品(定番商品リストに無いもの)の分も見込み合計に含める
+    const scannedTotal = scannedItems.reduce((sum, item) => sum + (item.price ?? 0) * item.quantity, 0)
+    return catalogTotal + scannedTotal
+  }, [products, consideringItemByProductId, scannedItems])
 
   const cartTotal = useMemo(() => {
     return tripItems
@@ -411,6 +424,46 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
               </ul>
             </section>
           ))}
+
+        {isPlanning && scannedItems.length > 0 && (
+          <section className="mb-4">
+            <h2 className="mb-1.5 text-xs font-semibold text-slate-500">スキャンした商品(定番商品リスト外)</h2>
+            <ul className="space-y-1.5">
+              {scannedItems.map((item) => (
+                <li key={item.id} className="flex items-center gap-2 rounded-xl bg-white px-3 py-2.5 shadow-sm">
+                  <span className="min-w-0 flex-1 truncate text-sm text-slate-800">{item.productName}</span>
+                  <div className="flex shrink-0 items-center gap-1 rounded-lg bg-slate-100 p-0.5">
+                    <button
+                      onClick={() => updateCartItemQuantity(item.id, item.quantity - 1)}
+                      className="rounded bg-white p-1 shadow-sm active:bg-slate-200"
+                      aria-label="数量を減らす"
+                    >
+                      <Minus className="h-3.5 w-3.5 text-slate-700" />
+                    </button>
+                    <span className="w-5 text-center text-xs font-bold text-slate-800">{item.quantity}</span>
+                    <button
+                      onClick={() => updateCartItemQuantity(item.id, item.quantity + 1)}
+                      className="rounded bg-white p-1 shadow-sm active:bg-slate-200"
+                      aria-label="数量を増やす"
+                    >
+                      <Plus className="h-3.5 w-3.5 text-slate-700" />
+                    </button>
+                  </div>
+                  <span className="shrink-0 text-xs text-slate-400">
+                    ¥{((item.price ?? 0) * item.quantity).toLocaleString()}
+                  </span>
+                  <button
+                    onClick={() => removeTripItem(item.id)}
+                    className="shrink-0 p-1 text-slate-300 active:text-red-500"
+                    aria-label="今回買うものリストから外す"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         {isActive &&
           groupedTripItems.map(({ category, items }) => (
