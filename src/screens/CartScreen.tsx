@@ -1,6 +1,6 @@
-import { useState } from 'react'
-import { ArrowLeft, CheckCircle2, Camera } from 'lucide-react'
-import { useTripStore } from '../store/tripStore'
+import { useEffect, useState } from 'react'
+import { ArrowLeft, CheckCircle2, Camera, TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { useTripStore, fetchLastCompletedTripTotal } from '../store/tripStore'
 import { TricolorAccent } from '../components/TricolorAccent'
 import { BarcodeScanSheet } from '../components/BarcodeScanSheet'
 import { CartFillDisplay } from '../components/CartFillDisplay'
@@ -16,6 +16,9 @@ import { CartFillDisplay } from '../components/CartFillDisplay'
 //
 // 【フェーズ3】カートに商品が入っていくたびに、カート写真の中に絵文字が
 // 増えていくアニメーションを実装(CartFillDisplayを参照)
+//
+// 【フェーズ4】今回の合計金額を、前回完了した買い物の合計金額と比較して
+// 表示する(costco_app_concept_v3.mdの「買い物1回ごとの合計金額の比較」)
 
 type Props = {
   /** リスト画面(画面A)へ戻る時に呼ぶ */
@@ -29,10 +32,16 @@ export function CartScreen({ onBack }: Props) {
   const addScannedItem = useTripStore((state) => state.addScannedItem)
   const [isCheckingOut, setIsCheckingOut] = useState(false)
   const [isScanOpen, setIsScanOpen] = useState(false)
+  const [lastTripTotal, setLastTripTotal] = useState<number | null>(null)
+
+  useEffect(() => {
+    void fetchLastCompletedTripTotal().then(setLastTripTotal)
+  }, [])
 
   const cartItems = tripItems.filter((item) => item.status === 'inCart')
   const total = cartItems.reduce((sum, item) => sum + (item.price ?? 0) * item.quantity, 0)
   const itemCount = cartItems.reduce((sum, item) => sum + item.quantity, 0)
+  const totalDiff = lastTripTotal !== null ? total - lastTripTotal : null
 
   async function handleCheckout() {
     const confirmed = window.confirm(`買い物を終了しますか?\n合計金額: ¥${total.toLocaleString()}`)
@@ -75,6 +84,22 @@ export function CartScreen({ onBack }: Props) {
         <div className="mt-4 text-center">
           <p className="text-sm text-slate-500">カート内 {itemCount}点</p>
           <p className="text-4xl font-semibold tracking-tight text-slate-800">¥{total.toLocaleString()}</p>
+          {totalDiff !== null && (
+            <p
+              className={`mt-1 flex items-center justify-center gap-1 text-sm font-medium ${
+                totalDiff > 0 ? 'text-costco-red-600' : totalDiff < 0 ? 'text-green-600' : 'text-slate-400'
+              }`}
+            >
+              {totalDiff > 0 ? (
+                <TrendingUp className="h-4 w-4" />
+              ) : totalDiff < 0 ? (
+                <TrendingDown className="h-4 w-4" />
+              ) : (
+                <Minus className="h-4 w-4" />
+              )}
+              {totalDiff === 0 ? '前回と同じ' : `前回より${totalDiff > 0 ? '+' : ''}¥${totalDiff.toLocaleString()}`}
+            </p>
+          )}
         </div>
       </main>
 
