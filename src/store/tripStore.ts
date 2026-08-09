@@ -667,3 +667,27 @@ export async function fetchAllPurchaseHistory(): Promise<PurchaseHistoryEntry[]>
     }))
     .sort((a, b) => (a.purchasedAt > b.purchasedAt ? -1 : 1))
 }
+
+export type CompletedTripSummary = {
+  id: string
+  completedAt: string
+  actualTotal: number
+}
+
+/**
+ * 完了した買い物トリップをすべて取得する(古い順)。画面Cの
+ * 「買い物1回ごとの合計金額の推移グラフ」「年間利用額」で使う
+ */
+export async function fetchAllCompletedTrips(): Promise<CompletedTripSummary[]> {
+  const householdId = requireHouseholdId()
+  const snapshot = await getDocs(
+    query(householdCollection(householdId, 'shoppingTrips'), where('status', '==', 'completed')),
+  )
+  return snapshot.docs
+    .map((d) => ({
+      id: d.id,
+      completedAt: (d.data().completedAt ?? '') as string,
+      actualTotal: (d.data().actualTotal ?? 0) as number,
+    }))
+    .sort((a, b) => (a.completedAt < b.completedAt ? -1 : 1))
+}

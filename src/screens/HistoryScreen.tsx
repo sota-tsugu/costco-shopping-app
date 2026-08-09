@@ -1,19 +1,23 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft } from 'lucide-react'
-import { fetchAllPurchaseHistory, type PurchaseHistoryEntry } from '../store/tripStore'
+import {
+  fetchAllPurchaseHistory,
+  fetchAllCompletedTrips,
+  type PurchaseHistoryEntry,
+  type CompletedTripSummary,
+} from '../store/tripStore'
 import { TricolorAccent } from '../components/TricolorAccent'
+import { LineChart, type LineChartPoint } from '../components/LineChart'
 
 // 画面C:購入履歴・レポート画面(いつでも振り返れる画面)。
 // 買い物の前後に関わらず、いつでも過去の記録を振り返れる画面として、
 // 画面Aのヘッダーからいつでも開ける(costco_app_concept_v3.mdの
 // 「2. 画面構成」を参照)。
 //
-// 【フェーズ1(最小実装)の割り切り】まずは「全体の購入履歴一覧」から
-// 着手する。買い物1回ごとの合計金額の推移グラフ・商品単価の変動推移・
-// 年間利用額は、レイアウトも含めて後日追加する想定
-//
-// 【表示の考え方】商品ごとの履歴(ProductHistorySheet)とは別に、
-// すべての商品を横断して、購入日の新しい順・月ごとにまとめて表示する
+// 【表示の考え方】上から、年間利用額→買い物1回ごとの合計金額の推移
+// グラフ→全体の購入履歴一覧(月ごとにまとめて新しい順)、という
+// 構成にしている。商品単価の変動推移は、商品ごとの詳細シート
+// (ProductHistorySheet)側にすでにあるため、ここでは扱わない
 
 const OTHER_MONTH = '日付不明'
 
@@ -37,16 +41,38 @@ function monthLabel(iso: string): string {
 
 export function HistoryScreen({ onBack }: Props) {
   const [history, setHistory] = useState<PurchaseHistoryEntry[] | null>(null)
+  const [trips, setTrips] = useState<CompletedTripSummary[] | null>(null)
 
   useEffect(() => {
     let cancelled = false
     void fetchAllPurchaseHistory().then((rows) => {
       if (!cancelled) setHistory(rows)
     })
+    void fetchAllCompletedTrips().then((rows) => {
+      if (!cancelled) setTrips(rows)
+    })
     return () => {
       cancelled = true
     }
   }, [])
+
+  // 買い物1回ごとの合計金額の推移グラフ用データ(fetchAllCompletedTripsは
+  // すでに古い順に並んでいる)
+  const tripTotalPoints: LineChartPoint[] = (trips ?? []).map((t) => ({
+    date: t.completedAt,
+    value: t.actualTotal,
+  }))
+
+  // 年ごとの利用額合計(新しい年が上に来るよう並べる)
+  const yearlyTotals = useMemo(() => {
+    if (!trips) return []
+    const map = new Map<string, number>()
+    for (const trip of trips) {
+      const year = trip.completedAt ? String(new Date(trip.completedAt).getFullYear()) : '日付不明'
+      map.set(year, (map.get(year) ?? 0) + trip.actualTotal)
+    }
+    return [...map.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1))
+  }, [trips])
 
   const groupedByMonth = useMemo(() => {
     if (!history) return []
@@ -78,6 +104,27 @@ export function HistoryScreen({ onBack }: Props) {
       </header>
 
       <main className="mx-auto max-w-md px-4 py-4">
+        {yearlyTotals.length > 0 && (
+          <section className="mb-4 rounded-xl bg-white p-4 shadow-sm">
+            <h2 className="mb-2 text-xs font-semibold text-slate-500">年間利用額</h2>
+            <ul className="space-y-1.5">
+              {yearlyTotals.map(([year, total]) => (
+                <li key={year} className="flex items-center justify-between text-sm">
+                  <span className="text-slate-500">{year}年</span>
+                  <span className="font-semibold text-slate-800">¥{total.toLocaleString()}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {tripTotalPoints.length >= 2 && (
+          <section className="mb-4 rounded-xl bg-white p-4 shadow-sm">
+            <h2 className="mb-1.5 text-xs font-semibold text-slate-500">買い物ごとの合計金額の推移</h2>
+            <LineChart points={tripTotalPoints} title="買い物ごとの合計金額の推移グラフ" />
+          </section>
+        )}
+
         {history === null && <p className="text-sm text-slate-400">読み込んでいます…</p>}
 
         {history !== null && history.length === 0 && (

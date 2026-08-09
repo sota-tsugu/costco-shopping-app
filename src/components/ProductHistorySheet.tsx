@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { X, TrendingUp, TrendingDown, Minus, Pencil, Trash2 } from 'lucide-react'
 import { useTripStore, fetchPurchaseHistoryByProductName, type ProductPurchaseRecord } from '../store/tripStore'
+import { LineChart, formatYen, type LineChartPoint } from './LineChart'
 
 // 商品ごとの詳細シート:単価比較・購入履歴・購入頻度を表示する。
 // 画面Aの買い物中(active)リストで商品名をタップすると開く
@@ -17,26 +18,9 @@ import { useTripStore, fetchPurchaseHistoryByProductName, type ProductPurchaseRe
 // (旧アプリで作っていた仕組みを踏襲)。訂正・削除すると、その記録が
 // 属するトリップの実際の合計金額(actualTotal)も裏側で再計算される
 //
-// 【単価推移グラフ】外部のグラフ描画ライブラリ(Chart.jsなど)は使わず、
-// インラインSVGを自前で組み立てて描いている(costco_app_concept_v3.mdの
-// 技術方針より)。内容量が分かっている記録だけを古い順に並べ、
-// JavaScriptでデータの最小値・最大値から座標を計算している
-
-const CHART_WIDTH = 300
-const CHART_HEIGHT = 140
-const CHART_MARGIN = { top: 14, right: 12, bottom: 22, left: 44 }
-
-type ChartPoint = { date: string; value: number }
-
-function formatYen(value: number): string {
-  return value.toLocaleString('ja-JP', { maximumFractionDigits: 1 })
-}
-
-function formatShortDate(iso: string): string {
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
-  return `${d.getMonth() + 1}/${d.getDate()}`
-}
+// 【単価推移グラフ】内容量が分かっている記録だけを古い順に並べ、
+// 共通のLineChartコンポーネント(src/components/LineChart.tsx)で描く。
+// 買い物ごとの合計金額の推移グラフ(画面C)と同じ仕組みを再利用している
 
 type Props = {
   productName: string
@@ -102,9 +86,9 @@ export function ProductHistorySheet({ productName, onClose }: Props) {
   }
 
   // 単価推移グラフ用のデータ:内容量が分かる記録だけを、古い順に並べる
-  const unitPricePoints: ChartPoint[] = (history ?? [])
+  const unitPricePoints: LineChartPoint[] = (history ?? [])
     .map((record) => ({ date: record.purchasedAt, value: unitPrice(record) }))
-    .filter((p): p is ChartPoint => p.value !== null)
+    .filter((p): p is LineChartPoint => p.value !== null)
     .sort((a, b) => (a.date < b.date ? -1 : 1))
 
   // 内容量が分かる記録すべての単価の平均(いつもだいたいどれくらいの
@@ -192,7 +176,7 @@ export function ProductHistorySheet({ productName, onClose }: Props) {
             {unitPricePoints.length >= 2 && (
               <div className="mb-4 rounded-xl bg-slate-50 p-3">
                 <span className="mb-1 block text-xs text-slate-500">単価の推移(内容量あたり)</span>
-                <UnitPriceChart points={unitPricePoints} />
+                <LineChart points={unitPricePoints} title="単価の推移グラフ" />
               </div>
             )}
 
@@ -356,82 +340,5 @@ function EditPurchaseRecordSheet({ record, onClose, onSaved }: EditPurchaseRecor
         </button>
       </div>
     </div>
-  )
-}
-
-/**
- * 単価の推移を表す折れ線グラフ。外部ライブラリは使わず、データの
- * 最小値・最大値からJavaScriptで座標を計算し、インラインSVGで描く
- * (costco_app_concept_v3.mdの技術方針より)
- */
-function UnitPriceChart({ points }: { points: ChartPoint[] }) {
-  const plotWidth = CHART_WIDTH - CHART_MARGIN.left - CHART_MARGIN.right
-  const plotHeight = CHART_HEIGHT - CHART_MARGIN.top - CHART_MARGIN.bottom
-
-  const values = points.map((p) => p.value)
-  const rawMin = Math.min(...values)
-  const rawMax = Math.max(...values)
-  // 最小値と最大値が同じ(値上がり/値下がりが無い)場合に0除算にならないよう、
-  // 上下に少し余白を持たせる
-  const minValue = rawMin === rawMax ? rawMin - 1 : rawMin
-  const maxValue = rawMin === rawMax ? rawMax + 1 : rawMax
-
-  function xAt(index: number): number {
-    if (points.length === 1) return CHART_MARGIN.left + plotWidth / 2
-    return CHART_MARGIN.left + (index / (points.length - 1)) * plotWidth
-  }
-  function yAt(value: number): number {
-    return CHART_MARGIN.top + plotHeight - ((value - minValue) / (maxValue - minValue)) * plotHeight
-  }
-
-  const coords = points.map((p, i) => ({ x: xAt(i), y: yAt(p.value), point: p }))
-  const linePath = coords.map((c, i) => `${i === 0 ? 'M' : 'L'}${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(' ')
-
-  // x軸のラベルは、詰まりすぎないよう最大4件(最初・最後を必ず含む)だけ表示する
-  const labelIndices = new Set<number>([0, points.length - 1])
-  if (points.length > 2) {
-    const mid = Math.floor((points.length - 1) / 2)
-    labelIndices.add(mid)
-  }
-
-  return (
-    <svg viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`} className="w-full" role="img">
-      <title>単価の推移グラフ</title>
-      <line
-        x1={CHART_MARGIN.left}
-        y1={CHART_MARGIN.top}
-        x2={CHART_MARGIN.left}
-        y2={CHART_HEIGHT - CHART_MARGIN.bottom}
-        stroke="#e2e8f0"
-      />
-      <line
-        x1={CHART_MARGIN.left}
-        y1={CHART_HEIGHT - CHART_MARGIN.bottom}
-        x2={CHART_WIDTH - CHART_MARGIN.right}
-        y2={CHART_HEIGHT - CHART_MARGIN.bottom}
-        stroke="#e2e8f0"
-      />
-
-      <text x={CHART_MARGIN.left - 6} y={CHART_MARGIN.top + 4} textAnchor="end" fontSize="10" fill="#94a3b8">
-        ¥{formatYen(maxValue)}
-      </text>
-      <text x={CHART_MARGIN.left - 6} y={CHART_HEIGHT - CHART_MARGIN.bottom} textAnchor="end" fontSize="10" fill="#94a3b8">
-        ¥{formatYen(minValue)}
-      </text>
-
-      <path d={linePath} fill="none" stroke="#00427c" strokeWidth="2" />
-
-      {coords.map((c, i) => (
-        <circle key={i} cx={c.x} cy={c.y} r={i === coords.length - 1 ? 4 : 3} fill="#00427c" />
-      ))}
-
-      {coords
-        .filter((_, i) => labelIndices.has(i))
-        .map((c, i) => (
-          <text key={i} x={c.x} y={CHART_HEIGHT - CHART_MARGIN.bottom + 14} textAnchor="middle" fontSize="10" fill="#94a3b8">
-            {formatShortDate(c.point.date)}
-          </text>
-        ))}
-    </svg>
   )
 }
