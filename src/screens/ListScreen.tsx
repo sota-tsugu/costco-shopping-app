@@ -1,5 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Check, ChevronRight, Settings, ShoppingCart, X, Search, Minus, Trash2, Pencil, History } from 'lucide-react'
+import {
+  Plus,
+  Check,
+  ChevronRight,
+  Settings,
+  ShoppingCart,
+  X,
+  Search,
+  Minus,
+  Trash2,
+  Pencil,
+  History,
+  BarChart3,
+} from 'lucide-react'
 import {
   useTripStore,
   fetchLastCompletedTripProductNames,
@@ -29,9 +42,11 @@ const OTHER_CATEGORY = 'その他'
 type Props = {
   /** カート画面(画面B)へ移動する時に呼ぶ */
   onOpenCart: () => void
+  /** 購入履歴・レポート画面(画面C)へ移動する時に呼ぶ */
+  onOpenHistory: () => void
 }
 
-export function ListScreen({ onOpenCart }: Props) {
+export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
   const products = useTripStore((state) => state.products)
   const currentTrip = useTripStore((state) => state.currentTrip)
   const tripItems = useTripStore((state) => state.tripItems)
@@ -233,6 +248,13 @@ export function ListScreen({ onOpenCart }: Props) {
                 </span>
               )}
             </div>
+            <button
+              onClick={onOpenHistory}
+              className="rounded-full p-1 text-costco-blue-100 transition-colors hover:bg-costco-blue-600"
+              aria-label="購入履歴・レポート"
+            >
+              <BarChart3 className="h-5 w-5" />
+            </button>
             <button
               onClick={() => setIsSettingsOpen(true)}
               className="rounded-full p-1 text-costco-blue-100 transition-colors hover:bg-costco-blue-600"

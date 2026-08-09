@@ -3,6 +3,7 @@ import { HouseholdSetupScreen } from './screens/HouseholdSetupScreen'
 import { SplashScreen } from './screens/SplashScreen'
 import { ListScreen } from './screens/ListScreen'
 import { CartScreen } from './screens/CartScreen'
+import { HistoryScreen } from './screens/HistoryScreen'
 import { UpdateBanner } from './components/UpdateBanner'
 import { getSavedHouseholdId } from './firebase/household'
 import { useTripStore } from './store/tripStore'
@@ -32,7 +33,7 @@ function App() {
   // 起動のたびに一度だけ、あいさつ画面(SplashScreen)を挟んでから
   // 本編(今回買うものリスト)へ進む。タップされるまでは本編を表示しない
   const [splashDismissed, setSplashDismissed] = useState(false)
-  const [view, setView] = useState<'list' | 'cart'>('list')
+  const [view, setView] = useState<'list' | 'cart' | 'history'>('list')
   const [transitionKey, setTransitionKey] = useState(0)
 
   const init = useTripStore((state) => state.init)
@@ -48,10 +49,12 @@ function App() {
   }, [householdReady, init])
 
   const isActive = currentTrip?.status === 'active'
-  // 買い物中(active)でなければ、カート画面を選んでいても常にリスト画面を表示する
-  const effectiveView = isActive ? view : 'list'
+  // 買い物中(active)でなければ、カート画面を選んでいても常にリスト画面を表示する。
+  // 画面C(購入履歴)は「買い物の前後に関わらずいつでも振り返れる」画面のため、
+  // この制約の対象外にしている
+  const effectiveView = view === 'history' ? 'history' : isActive ? view : 'list'
 
-  function goTo(next: 'list' | 'cart') {
+  function goTo(next: 'list' | 'cart' | 'history') {
     setView((prev) => {
       if (prev === next) return prev
       setTransitionKey((k) => k + 1)
@@ -60,13 +63,15 @@ function App() {
   }
 
   function handleTouchStart(e: TouchEvent<HTMLDivElement>) {
-    if (!isActive) return
+    // 画面C(購入履歴)を見ている間は、画面A/画面Bのスワイプ切り替えを
+    // 誤って発動させないようにする
+    if (!isActive || effectiveView === 'history') return
     const touch = e.touches[0]
     touchStart.current = { x: touch.clientX, y: touch.clientY }
   }
 
   function handleTouchEnd(e: TouchEvent<HTMLDivElement>) {
-    if (!isActive || !touchStart.current) return
+    if (!isActive || effectiveView === 'history' || !touchStart.current) return
     const touch = e.changedTouches[0]
     const dx = touch.clientX - touchStart.current.x
     const dy = touch.clientY - touchStart.current.y
@@ -107,8 +112,10 @@ function App() {
         <div key={transitionKey} className="screen-fade-in">
           {effectiveView === 'cart' ? (
             <CartScreen onBack={() => goTo('list')} />
+          ) : effectiveView === 'history' ? (
+            <HistoryScreen onBack={() => goTo('list')} />
           ) : (
-            <ListScreen onOpenCart={() => goTo('cart')} />
+            <ListScreen onOpenCart={() => goTo('cart')} onOpenHistory={() => goTo('history')} />
           )}
         </div>
       </div>

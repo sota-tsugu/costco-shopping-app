@@ -635,3 +635,35 @@ export async function fetchPurchaseHistoryByProductName(productName: string): Pr
     }))
     .sort((a, b) => (a.purchasedAt > b.purchasedAt ? -1 : 1))
 }
+
+export type PurchaseHistoryEntry = ProductPurchaseRecord & {
+  productName: string
+  category: string | null
+}
+
+/**
+ * 商品を問わず、購入済みの記録をすべて取得する。画面C(購入履歴・
+ * レポート画面)の「全体の購入履歴一覧」で使う。
+ * 家庭利用の範囲では件数が多くならない想定のため、一旦まとめて
+ * 取得してからJavaScript側で日付順に並べている(他の履歴系の関数と
+ * 同じ考え方。fetchLastCompletedTripProductNamesのコメントを参照)
+ */
+export async function fetchAllPurchaseHistory(): Promise<PurchaseHistoryEntry[]> {
+  const householdId = requireHouseholdId()
+  const snapshot = await getDocs(
+    query(householdCollection(householdId, 'tripItems'), where('status', '==', 'purchased')),
+  )
+  return snapshot.docs
+    .map((d) => ({
+      id: d.id,
+      tripId: d.data().tripId as string,
+      productName: d.data().productName as string,
+      category: (d.data().category ?? null) as string | null,
+      price: d.data().price as number,
+      amount: (d.data().amount ?? null) as number | null,
+      unit: (d.data().unit ?? null) as string | null,
+      quantity: (d.data().quantity ?? 1) as number,
+      purchasedAt: (d.data().addedToCartAt ?? d.data().createdAt ?? '') as string,
+    }))
+    .sort((a, b) => (a.purchasedAt > b.purchasedAt ? -1 : 1))
+}
