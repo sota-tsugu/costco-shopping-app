@@ -12,6 +12,7 @@ import {
   Pencil,
   History,
   ReceiptJapaneseYen,
+  AlertTriangle,
 } from 'lucide-react'
 import {
   useTripStore,
@@ -161,6 +162,12 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
       .filter((item) => item.status === 'inCart')
       .reduce((sum, item) => sum + (item.price ?? 0) * item.quantity, 0)
   }, [tripItems])
+
+  // 予算オーバーの判定。計画中は入力中の予算(budgetInput)、買い物中は
+  // 確定している予算(currentTrip.budget)と比べる
+  const budgetForPlanning = Number(budgetInput)
+  const isOverBudgetPlanning = budgetForPlanning > 0 && estimatedTotal > budgetForPlanning
+  const isOverBudgetActive = currentTrip !== null && cartTotal > currentTrip.budget
   // 画面B(カート)の点数表示と揃えるため、行数ではなく数量の合計を数える
   // (以前は行数のみを数えていたため、同じ商品の数量を増やしても点数が
   // 変わらない不具合があった)
@@ -284,7 +291,11 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
             <div className="flex items-end justify-between">
               <div>
                 <span className="text-xs text-costco-blue-100">見込み合計</span>
-                <div className="text-2xl font-semibold tracking-tight">¥{estimatedTotal.toLocaleString()}</div>
+                <div
+                  className={`text-2xl font-semibold tracking-tight ${isOverBudgetPlanning ? 'text-costco-red-200' : ''}`}
+                >
+                  ¥{estimatedTotal.toLocaleString()}
+                </div>
               </div>
               <div className="flex flex-col items-end">
                 <span className="text-xs text-costco-blue-100">予算</span>
@@ -301,6 +312,12 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
                 </label>
               </div>
             </div>
+            {isOverBudgetPlanning && (
+              <p className="mt-1 flex items-center justify-end gap-1 text-xs font-medium text-costco-red-200">
+                <AlertTriangle className="h-3.5 w-3.5" />
+                予算を¥{(estimatedTotal - budgetForPlanning).toLocaleString()}オーバーしています
+              </p>
+            )}
             {lastTripTotal !== null && (
               <p className="mt-1 text-right text-xs text-costco-blue-100">
                 前回の購入額 ¥{lastTripTotal.toLocaleString()}
@@ -313,7 +330,11 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
           <div className="mt-3">
             <button
               onClick={onOpenCart}
-              className="flex w-full items-center justify-between rounded-xl bg-costco-blue-600 px-3 py-2 transition-colors active:bg-costco-blue-800"
+              className={`flex w-full items-center justify-between rounded-xl px-3 py-2 transition-colors ${
+                isOverBudgetActive
+                  ? 'bg-costco-red-700 active:bg-costco-red-800'
+                  : 'bg-costco-blue-600 active:bg-costco-blue-800'
+              }`}
             >
               <span className="flex items-center gap-1.5 text-sm">
                 <ShoppingCart className="h-4 w-4" />
@@ -324,6 +345,12 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
                 <ChevronRight className="h-4 w-4" />
               </span>
             </button>
+            {isOverBudgetActive && currentTrip && (
+              <p className="mt-1.5 flex items-center gap-1 px-1 text-xs font-medium text-costco-red-200">
+                <AlertTriangle className="h-3.5 w-3.5" />
+                予算を¥{(cartTotal - currentTrip.budget).toLocaleString()}オーバーしています
+              </p>
+            )}
             {currentTrip && (
               <button
                 onClick={() => setIsPlanRecapOpen(true)}

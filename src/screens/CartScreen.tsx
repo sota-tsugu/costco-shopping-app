@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, CheckCircle2, Camera, TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, Camera, TrendingUp, TrendingDown, Minus, AlertTriangle } from 'lucide-react'
 import { useTripStore, fetchLastCompletedTripTotal } from '../store/tripStore'
 import { TricolorAccent } from '../components/TricolorAccent'
 import { BarcodeScanSheet } from '../components/BarcodeScanSheet'
@@ -30,6 +30,7 @@ type Props = {
 export function CartScreen({ onBack }: Props) {
   const tripItems = useTripStore((state) => state.tripItems)
   const products = useTripStore((state) => state.products)
+  const currentTrip = useTripStore((state) => state.currentTrip)
   const completeCheckout = useTripStore((state) => state.completeCheckout)
   const addScannedItem = useTripStore((state) => state.addScannedItem)
   const backToPlanning = useTripStore((state) => state.backToPlanning)
@@ -45,6 +46,7 @@ export function CartScreen({ onBack }: Props) {
   const total = cartItems.reduce((sum, item) => sum + (item.price ?? 0) * item.quantity, 0)
   const itemCount = cartItems.reduce((sum, item) => sum + item.quantity, 0)
   const totalDiff = lastTripTotal !== null ? total - lastTripTotal : null
+  const isOverBudget = currentTrip !== null && total > currentTrip.budget
 
   async function handleCheckout() {
     const confirmed = window.confirm(`買い物を終了しますか?\n合計金額: ¥${total.toLocaleString()}`)
@@ -110,7 +112,17 @@ export function CartScreen({ onBack }: Props) {
 
         <div className="mt-4 text-center">
           <p className="text-sm text-slate-500">カート内 {itemCount}点</p>
-          <p className="text-4xl font-semibold tracking-tight text-slate-800">¥{total.toLocaleString()}</p>
+          <p
+            className={`text-4xl font-semibold tracking-tight ${isOverBudget ? 'text-costco-red-600' : 'text-slate-800'}`}
+          >
+            ¥{total.toLocaleString()}
+          </p>
+          {isOverBudget && currentTrip && (
+            <p className="mt-1 flex items-center justify-center gap-1 text-sm font-medium text-costco-red-600">
+              <AlertTriangle className="h-4 w-4" />
+              予算(¥{currentTrip.budget.toLocaleString()})を¥{(total - currentTrip.budget).toLocaleString()}オーバー
+            </p>
+          )}
           {totalDiff !== null && (
             <p
               className={`mt-1 flex items-center justify-center gap-1 text-sm font-medium ${

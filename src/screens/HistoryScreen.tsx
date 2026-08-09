@@ -89,6 +89,20 @@ export function HistoryScreen({ onBack }: Props) {
     return [...map.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1))
   }, [trips])
 
+  // カテゴリ別の支出割合(全期間の集計。検索による絞り込みの対象にはしない)
+  const categoryTotals = useMemo(() => {
+    if (!history) return []
+    const map = new Map<string, number>()
+    for (const entry of history) {
+      const category = entry.category ?? 'その他'
+      map.set(category, (map.get(category) ?? 0) + entry.price * entry.quantity)
+    }
+    const total = [...map.values()].reduce((sum, v) => sum + v, 0)
+    return [...map.entries()]
+      .map(([category, amount]) => ({ category, amount, percent: total > 0 ? (amount / total) * 100 : 0 }))
+      .sort((a, b) => b.amount - a.amount)
+  }, [history])
+
   // 商品名で絞り込んだ履歴(検索欄が空の時はそのまま全件)
   const filteredHistory = useMemo(() => {
     if (!history) return null
@@ -181,6 +195,31 @@ export function HistoryScreen({ onBack }: Props) {
               <section className="mb-4 rounded-xl bg-white p-4 shadow-sm">
                 <h2 className="mb-1.5 text-xs font-semibold text-slate-500">買い物ごとの合計金額の推移</h2>
                 <LineChart points={tripTotalPoints} title="買い物ごとの合計金額の推移グラフ" />
+              </section>
+            )}
+
+            {categoryTotals.length > 0 && (
+              <section className="mb-4 rounded-xl bg-white p-4 shadow-sm">
+                <h2 className="mb-2 text-xs font-semibold text-slate-500">カテゴリ別の支出割合</h2>
+                <ul className="space-y-2.5">
+                  {categoryTotals.map(({ category, amount, percent }) => (
+                    <li key={category}>
+                      <div className="mb-1 flex items-center justify-between text-sm">
+                        <span className="text-slate-700">{category}</span>
+                        <span className="text-slate-500">
+                          ¥{amount.toLocaleString()}
+                          <span className="ml-1 text-xs text-slate-400">({percent.toFixed(0)}%)</span>
+                        </span>
+                      </div>
+                      <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                        <div
+                          className="h-2 rounded-full bg-costco-blue-600"
+                          style={{ width: `${percent}%` }}
+                        />
+                      </div>
+                    </li>
+                  ))}
+                </ul>
               </section>
             )}
 
