@@ -596,10 +596,14 @@ function AddProductSheet({ existingProducts, onClose, onSubmit }: AddProductShee
   const [isSuggestionsOpen, setIsSuggestionsOpen] = useState(false)
 
   // 商品名候補データベース(costcotuu.com由来・約3200件)から、商品名の
-  // 入力補助を行う。名前を選ぶとカテゴリも一緒に入る。2文字以上で検索する
+  // 入力補助を行う。名前を選ぶとカテゴリも一緒に入る。
+  // 通常は2文字以上で検索するが、漢字は1文字でも意味が絞られやすい
+  // (例:「豚」「鶏」)ため、1文字目が漢字の場合は1文字から候補を出す
   const nameSuggestions = useMemo(() => {
     const trimmed = name.trim().toLowerCase()
-    if (trimmed.length < 2) return []
+    const startsWithKanji = /[一-鿿]/.test(trimmed[0] ?? '')
+    const minLength = startsWithKanji ? 1 : 2
+    if (trimmed.length < minLength) return []
     return PRODUCT_CATALOG.filter((entry) => entry.name.toLowerCase().includes(trimmed)).slice(0, 12)
   }, [name])
 
