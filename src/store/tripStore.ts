@@ -425,10 +425,18 @@ export const useTripStore = create<TripStoreState>((set, get) => ({
 
     const inCartItems = tripItems.filter((item) => item.status === 'inCart')
     const actualTotal = inCartItems.reduce((sum, item) => sum + (item.price ?? 0) * item.quantity, 0)
+    // カートに入れないまま(検討中のまま)会計を終えた商品は、購入済みにも
+    // ならず宙に浮いたデータとして残ってしまうため、この時点でまとめて
+    // 削除する。定番商品リスト側の登録(商品そのもの)には触れないため、
+    // 次回の買い物では今まで通り選び直せる
+    const leftoverConsideringItems = tripItems.filter((item) => item.status === 'considering')
 
     const batch = writeBatch(db)
     for (const item of inCartItems) {
       batch.update(doc(householdCollection(householdId, 'tripItems'), item.id), { status: 'purchased' })
+    }
+    for (const item of leftoverConsideringItems) {
+      batch.delete(doc(householdCollection(householdId, 'tripItems'), item.id))
     }
     batch.update(doc(householdCollection(householdId, 'shoppingTrips'), currentTrip.id), {
       status: 'completed',

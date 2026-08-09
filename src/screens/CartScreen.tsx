@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, CheckCircle2, Camera, TrendingUp, TrendingDown, Minus, AlertTriangle } from 'lucide-react'
-import { useTripStore, fetchLastCompletedTripTotal } from '../store/tripStore'
+import { ArrowLeft, CheckCircle2, Camera, TrendingUp, TrendingDown, Minus, AlertTriangle, X } from 'lucide-react'
+import { useTripStore, fetchLastCompletedTripTotal, type TripItem } from '../store/tripStore'
 import { TricolorAccent } from '../components/TricolorAccent'
 import { BarcodeScanSheet } from '../components/BarcodeScanSheet'
 import { CartFillDisplay } from '../components/CartFillDisplay'
@@ -21,6 +21,14 @@ import { ScreenPageDots } from '../components/ScreenPageDots'
 //
 // 【フェーズ4】今回の合計金額を、前回完了した買い物の合計金額と比較して
 // 表示する(costco_app_concept_v3.mdの「買い物1回ごとの合計金額の比較」)
+//
+// 【買い忘れ確認】「購入する」を押した時、今回買うものリストに入れた
+// (検討中の)まま、カートに入れていない商品が残っていたら、確認シート
+// (MissingItemsSheet)を挟む。あくまで「気づけるようにする」だけの
+// 軽い確認で、リストへ戻って修正することは求めない(在庫が無かった等、
+// 直しようがない場合もあるため)。「このまま購入する」を選ぶと、
+// その検討中の商品はtripStore.completeCheckout()側で削除され、
+// 宙に浮いたデータとして残らないようにしている
 
 type Props = {
   /** リスト画面(画面A)へ戻る時に呼ぶ */
@@ -37,6 +45,7 @@ export function CartScreen({ onBack }: Props) {
   const [isCheckingOut, setIsCheckingOut] = useState(false)
   const [isScanOpen, setIsScanOpen] = useState(false)
   const [lastTripTotal, setLastTripTotal] = useState<number | null>(null)
+  const [missingItems, setMissingItems] = useState<TripItem[] | null>(null)
 
   useEffect(() => {
     void fetchLastCompletedTripTotal().then(setLastTripTotal)
@@ -48,9 +57,21 @@ export function CartScreen({ onBack }: Props) {
   const totalDiff = lastTripTotal !== null ? total - lastTripTotal : null
   const isOverBudget = currentTrip !== null && total > currentTrip.budget
 
-  async function handleCheckout() {
+  // 「購入する」タップ時のエントリーポイント。今回買うものリストに
+  // 入れたまま(検討中の)カートに入れていない商品が残っていれば、
+  // 先に確認シートを挟む。無ければ今まで通りの確認ダイアログのまま
+  function handleCheckoutTap() {
+    const consideringItems = tripItems.filter((item) => item.status === 'considering')
+    if (consideringItems.length > 0) {
+      setMissingItems(consideringItems)
+      return
+    }
     const confirmed = window.confirm(`買い物を終了しますか?\n合計金額: ¥${total.toLocaleString()}`)
     if (!confirmed) return
+    void runCheckout()
+  }
+
+  async function runCheckout() {
     setIsCheckingOut(true)
     try {
       await completeCheckout()
@@ -144,7 +165,7 @@ export function CartScreen({ onBack }: Props) {
 
       <div className="border-t border-slate-200 bg-white p-4">
         <button
-          onClick={handleCheckout}
+          onClick={handleCheckoutTap}
           disabled={cartItems.length === 0 || isCheckingOut}
           className="mx-auto flex w-full max-w-md items-center justify-center gap-2 rounded-xl bg-green-600 px-4 py-4 text-lg font-semibold text-white shadow transition-colors active:bg-green-700 disabled:opacity-40"
         >
@@ -172,6 +193,76 @@ export function CartScreen({ onBack }: Props) {
           }}
         />
       )}
+
+      {missingItems && (
+        <MissingItemsSheet
+          items={missingItems}
+          isProcessing={isCheckingOut}
+          onCancel={() => setMissingItems(null)}
+          onConfirm={async () => {
+            setMissingItems(null)
+            await runCheckout()
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+type MissingItemsSheetProps = {
+  /** 今回買うものリストに入れたまま、カートに入っていない商品(検討中) */
+  items: TripItem[]
+  isProcessing: boolean
+  /** 会計をやめて、そのままカート画面に留まる */
+  onCancel: () => void
+  /** 買い忘れを承知の上で、そのまま会計を完了する */
+  onConfirm: () => void
+}
+
+/**
+ * 「購入する」を押した時、検討中のまま残っている商品があれば表示する
+ * 確認シート。あくまで気づけるようにするための軽い確認で、リストへ
+ * 戻って修正することは求めない(在庫が無かった等、直しようがない
+ * 場合もあるため)。「このまま購入する」を選んだ場合、この検討中の
+ * 商品はtripStore.completeCheckout()側でまとめて削除される
+ */
+function MissingItemsSheet({ items, isProcessing, onCancel, onConfirm }: MissingItemsSheetProps) {
+  return (
+    <div className="fixed inset-0 z-30 flex items-end justify-center bg-black/40 sm:items-center">
+      <div className="w-full max-w-sm rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-2xl">
+        <div className="mb-3 flex items-start justify-between gap-2">
+          <h2 className="text-base font-bold text-slate-800">買い忘れはありませんか?</h2>
+          <button onClick={onCancel} className="shrink-0 rounded-full p-1 text-slate-400 hover:bg-slate-100">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <p className="mb-3 text-sm text-slate-500">
+          今回買うものリストに入れたまま、カートに入っていない商品があります。
+        </p>
+        <ul className="mb-5 max-h-48 space-y-1.5 overflow-y-auto">
+          {items.map((item) => (
+            <li key={item.id} className="truncate rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-700">
+              {item.productName}
+            </li>
+          ))}
+        </ul>
+
+        <button
+          onClick={onConfirm}
+          disabled={isProcessing}
+          className="mb-3 flex w-full items-center justify-center gap-2 rounded-xl bg-green-600 px-4 py-3 font-semibold text-white shadow transition-colors active:bg-green-700 disabled:opacity-50"
+        >
+          <CheckCircle2 className="h-5 w-5" />
+          このまま購入する
+        </button>
+        <button
+          onClick={onCancel}
+          disabled={isProcessing}
+          className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-600 disabled:opacity-50"
+        >
+          やめる
+        </button>
+      </div>
     </div>
   )
 }
