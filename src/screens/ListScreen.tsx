@@ -38,6 +38,7 @@ export function ListScreen({ onOpenCart }: Props) {
   const updateTripBudget = useTripStore((state) => state.updateTripBudget)
   const togglePlannedProduct = useTripStore((state) => state.togglePlannedProduct)
   const startShopping = useTripStore((state) => state.startShopping)
+  const backToPlanning = useTripStore((state) => state.backToPlanning)
   const addToCart = useTripStore((state) => state.addToCart)
   const updateProduct = useTripStore((state) => state.updateProduct)
   const removeProduct = useTripStore((state) => state.removeProduct)
@@ -69,16 +70,26 @@ export function ListScreen({ onOpenCart }: Props) {
   const isPlanning = currentTrip?.status === 'planning'
   const isActive = currentTrip?.status === 'active'
 
+  // 計画中の画面では「検討中」だけでなく「会計待ち(inCart)」も
+  // チェック済みとして扱う。買い物中から計画中に戻れるようにしたため、
+  // すでにカートに入れた商品も「選んでいる」状態として正しく表示する必要がある
   const consideringProductIds = useMemo(
-    () => new Set(tripItems.filter((item) => item.status === 'considering').map((item) => item.productId)),
+    () =>
+      new Set(
+        tripItems
+          .filter((item) => item.status === 'considering' || item.status === 'inCart')
+          .map((item) => item.productId),
+      ),
     [tripItems],
   )
 
-  // 商品id→検討中のtripItem。数量の参照・変更に使う
+  // 商品id→検討中 or 会計待ちのtripItem。数量の参照・変更に使う
   const consideringItemByProductId = useMemo(() => {
     const map = new Map<string, TripItem>()
     for (const item of tripItems) {
-      if (item.status === 'considering' && item.productId) map.set(item.productId, item)
+      if ((item.status === 'considering' || item.status === 'inCart') && item.productId) {
+        map.set(item.productId, item)
+      }
     }
     return map
   }, [tripItems])
@@ -159,6 +170,17 @@ export function ListScreen({ onOpenCart }: Props) {
 
   async function handleStartShopping() {
     await startShopping()
+  }
+
+  // 買い物中から計画中に戻る。カートに入れた商品(inCart)・検討中の商品は
+  // 削除せずそのまま保持する(計画中の画面側で両方をチェック済みとして
+  // 扱うようにしている。consideringProductIds・consideringItemByProductIdを参照)
+  async function handleBackToPlanning() {
+    const confirmed = window.confirm(
+      '計画中の画面に戻りますか?カートに入れた商品や検討中の商品は、そのまま保持されます。',
+    )
+    if (!confirmed) return
+    await backToPlanning()
   }
 
   // 「前回買ったものを反映」:直近に完了した買い物トリップで実際に
@@ -269,6 +291,12 @@ export function ListScreen({ onOpenCart }: Props) {
                 <span className="underline underline-offset-2">計画を見る</span>
               </button>
             )}
+            <button
+              onClick={handleBackToPlanning}
+              className="mt-1 flex w-full items-center justify-end px-1 text-xs text-costco-blue-100 active:text-white"
+            >
+              <span className="underline underline-offset-2">計画中の画面に戻る</span>
+            </button>
           </div>
         )}
       </header>

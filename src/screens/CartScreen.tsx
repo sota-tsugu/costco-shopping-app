@@ -30,6 +30,7 @@ export function CartScreen({ onBack }: Props) {
   const products = useTripStore((state) => state.products)
   const completeCheckout = useTripStore((state) => state.completeCheckout)
   const addScannedItem = useTripStore((state) => state.addScannedItem)
+  const backToPlanning = useTripStore((state) => state.backToPlanning)
   const [isCheckingOut, setIsCheckingOut] = useState(false)
   const [isScanOpen, setIsScanOpen] = useState(false)
   const [lastTripTotal, setLastTripTotal] = useState<number | null>(null)
@@ -54,19 +55,39 @@ export function CartScreen({ onBack }: Props) {
     }
   }
 
+  // 買い物をやめて計画中の画面に戻る。カートに入れた商品・検討中の商品は
+  // 削除せずそのまま保持する(画面Aの計画中の画面側で、両方をチェック済み
+  // として扱うようにしている)
+  async function handleBackToPlanning() {
+    const confirmed = window.confirm(
+      '買い物をやめて、計画中の画面に戻りますか?カートに入れた商品は、そのまま保持されます。',
+    )
+    if (!confirmed) return
+    await backToPlanning()
+    onBack()
+  }
+
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
       <header className="bg-costco-blue-700 px-4 pb-4 pt-4 text-white shadow-md">
         <TricolorAccent />
-        <div className="mt-3 flex items-center gap-2">
+        <div className="mt-3 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onBack}
+              className="rounded-full p-1 text-costco-blue-100 transition-colors hover:bg-costco-blue-600"
+              aria-label="リストへ戻る"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+            <h1 className="text-base font-semibold">カート</h1>
+          </div>
           <button
-            onClick={onBack}
-            className="rounded-full p-1 text-costco-blue-100 transition-colors hover:bg-costco-blue-600"
-            aria-label="リストへ戻る"
+            onClick={handleBackToPlanning}
+            className="text-xs text-costco-blue-100 underline underline-offset-2 active:text-white"
           >
-            <ArrowLeft className="h-5 w-5" />
+            買い物をやめる
           </button>
-          <h1 className="text-base font-semibold">カート</h1>
         </div>
       </header>
 

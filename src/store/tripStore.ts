@@ -103,6 +103,13 @@ type TripStoreState = {
   togglePlannedProduct: (product: Product, selected: boolean) => Promise<void>
   /** 買い物を開始する(planning→active) */
   startShopping: () => Promise<void>
+  /**
+   * 買い物中(active)から計画中(planning)に戻る。カートに入れた商品
+   * (inCart)・検討中の商品(considering)はそのまま保持する(削除しない)。
+   * 計画中の画面側で、considering・inCartの両方をチェック済みとして
+   * 扱うことで、戻った時に選択状態が正しく見えるようにしている
+   */
+  backToPlanning: () => Promise<void>
 
   /** 検討中の商品をカートに入れる(considering→inCart)。価格等は商品の登録値をそのまま使う */
   addToCart: (tripItemId: string) => Promise<void>
@@ -328,7 +335,11 @@ export const useTripStore = create<TripStoreState>((set, get) => ({
         addedToCartAt: null,
       })
     } else {
-      const existing = tripItems.find((item) => item.productId === product.id && item.status === 'considering')
+      // considering(検討中)だけでなく、inCart(会計待ち。買い物中に戻ってから
+      // チェックを外した場合)も対象にする
+      const existing = tripItems.find(
+        (item) => item.productId === product.id && (item.status === 'considering' || item.status === 'inCart'),
+      )
       if (existing) {
         await deleteDoc(doc(householdCollection(householdId, 'tripItems'), existing.id))
       }
@@ -342,6 +353,16 @@ export const useTripStore = create<TripStoreState>((set, get) => ({
     await updateDoc(doc(householdCollection(householdId, 'shoppingTrips'), currentTrip.id), {
       status: 'active',
       startedAt: new Date().toISOString(),
+    })
+  },
+
+  async backToPlanning() {
+    const { currentTrip } = get()
+    if (!currentTrip) return
+    const householdId = requireHouseholdId()
+    await updateDoc(doc(householdCollection(householdId, 'shoppingTrips'), currentTrip.id), {
+      status: 'planning',
+      startedAt: null,
     })
   },
 
