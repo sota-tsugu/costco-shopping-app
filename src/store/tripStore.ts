@@ -121,6 +121,18 @@ type TripStoreState = {
   removeTripItem: (tripItemId: string) => Promise<void>
   /** 会計を完了する(inCartの商品をpurchasedにし、トリップをcompletedにする) */
   completeCheckout: () => Promise<void>
+  /**
+   * 購入済みの記録(1件)を訂正する。「買い物を終了する」の押し間違いなど、
+   * 確定後に内容が違っていた場合に使う。訂正後、その記録が属するトリップの
+   * 実際の合計金額(actualTotal)も再計算して更新する
+   */
+  updatePurchaseRecord: (
+    tripId: string,
+    tripItemId: string,
+    updates: { price: number; amount: number | null; unit: string | null; quantity: number },
+  ) => Promise<void>
+  /** 購入済みの記録(1件)を削除する。削除後、トリップの実際の合計金額も再計算する */
+  removePurchaseRecord: (tripId: string, tripItemId: string) => Promise<void>
 }
 
 function householdCollection(householdId: string, name: string): CollectionReference {
@@ -404,7 +416,46 @@ export const useTripStore = create<TripStoreState>((set, get) => ({
     })
     await batch.commit()
   },
+
+  async updatePurchaseRecord(tripId, tripItemId, updates) {
+    const householdId = requireHouseholdId()
+    await updateDoc(doc(householdCollection(householdId, 'tripItems'), tripItemId), {
+      price: updates.price,
+      amount: updates.amount,
+      unit: updates.unit,
+      quantity: updates.quantity,
+    })
+    await recalculateTripActualTotal(householdId, tripId)
+  },
+
+  async removePurchaseRecord(tripId, tripItemId) {
+    const householdId = requireHouseholdId()
+    await deleteDoc(doc(householdCollection(householdId, 'tripItems'), tripItemId))
+    await recalculateTripActualTotal(householdId, tripId)
+  },
 }))
+
+/**
+ * トリップの実際の合計金額(actualTotal)を、そのトリップに属する
+ * purchased状態のtripItemから計算し直して保存する。購入記録の訂正・
+ * 削除の後に呼び、合計金額の表示(前回の購入額など)が古いままに
+ * ならないようにする
+ */
+async function recalculateTripActualTotal(householdId: string, tripId: string): Promise<void> {
+  const snapshot = await getDocs(
+    query(
+      householdCollection(householdId, 'tripItems'),
+      where('tripId', '==', tripId),
+      where('status', '==', 'purchased'),
+    ),
+  )
+  const actualTotal = snapshot.docs.reduce((sum, d) => {
+    const price = (d.data().price ?? 0) as number
+    const quantity = (d.data().quantity ?? 1) as number
+    return sum + price * quantity
+  }, 0)
+  await updateDoc(doc(householdCollection(householdId, 'shoppingTrips'), tripId), { actualTotal })
+}
 
 /**
  * 商品ごとの直近の購入記録をまとめて取得する(価格・内容量・単位の初期値提案に使う)。
@@ -524,6 +575,10 @@ export async function fetchTripItemByBarcode(barcode: string): Promise<{
 }
 
 export type ProductPurchaseRecord = {
+  /** このtripItemのFirestore文書id(訂正・削除する時に使う) */
+  id: string
+  /** この記録が属するトリップのid(訂正・削除後、トリップの合計金額を再計算する時に使う) */
+  tripId: string
   price: number
   amount: number | null
   unit: string | null
@@ -549,6 +604,8 @@ export async function fetchPurchaseHistoryByProductName(productName: string): Pr
   )
   return snapshot.docs
     .map((d) => ({
+      id: d.id,
+      tripId: d.data().tripId as string,
       price: d.data().price as number,
       amount: (d.data().amount ?? null) as number | null,
       unit: (d.data().unit ?? null) as string | null,
