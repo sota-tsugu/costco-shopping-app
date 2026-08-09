@@ -107,6 +107,13 @@ export function ProductHistorySheet({ productName, onClose }: Props) {
     .filter((p): p is ChartPoint => p.value !== null)
     .sort((a, b) => (a.date < b.date ? -1 : 1))
 
+  // 内容量が分かる記録すべての単価の平均(いつもだいたいどれくらいの
+  // 単価で買っているか、の目安として出す)
+  const avgUnitPrice =
+    unitPricePoints.length > 0
+      ? unitPricePoints.reduce((sum, p) => sum + p.value, 0) / unitPricePoints.length
+      : null
+
   // 購入日の間隔(日数)の平均を、購入頻度の目安として出す
   let avgIntervalDays: number | null = null
   if (history && history.length >= 2) {
@@ -141,35 +148,44 @@ export function ProductHistorySheet({ productName, onClose }: Props) {
 
         {history !== null && history.length > 0 && (
           <>
-            {priceCompare && (
+            {(priceCompare || avgUnitPrice !== null) && (
               <div className="mb-3 rounded-xl bg-slate-50 p-3">
-                <span className="text-xs text-slate-500">前回との単価比較(内容量あたり)</span>
-                <div className="mt-1 flex items-center gap-1.5">
-                  {priceCompare.diff > 0 ? (
-                    <TrendingUp className="h-4 w-4 text-costco-red-600" />
-                  ) : priceCompare.diff < 0 ? (
-                    <TrendingDown className="h-4 w-4 text-green-600" />
-                  ) : (
-                    <Minus className="h-4 w-4 text-slate-400" />
-                  )}
-                  <span
-                    className={`text-lg font-semibold ${
-                      priceCompare.diff > 0
-                        ? 'text-costco-red-600'
-                        : priceCompare.diff < 0
-                          ? 'text-green-600'
-                          : 'text-slate-500'
-                    }`}
-                  >
-                    {priceCompare.diff === 0
-                      ? '変わらず'
-                      : `${priceCompare.diff > 0 ? '+' : ''}${formatYen(priceCompare.diff)}円(${priceCompare.percent > 0 ? '+' : ''}${priceCompare.percent.toFixed(0)}%)`}
-                  </span>
-                </div>
-                <p className="mt-1 text-xs text-slate-400">
-                  {formatDate(priceCompare.previousDate)}(¥{formatYen(priceCompare.previous)}) → {formatDate(priceCompare.latestDate)}
-                  (¥{formatYen(priceCompare.latest)})
-                </p>
+                {priceCompare && (
+                  <>
+                    <span className="text-xs text-slate-500">前回との単価比較(内容量あたり)</span>
+                    <div className="mt-1 flex items-center gap-1.5">
+                      {priceCompare.diff > 0 ? (
+                        <TrendingUp className="h-4 w-4 text-costco-red-600" />
+                      ) : priceCompare.diff < 0 ? (
+                        <TrendingDown className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <Minus className="h-4 w-4 text-slate-400" />
+                      )}
+                      <span
+                        className={`text-lg font-semibold ${
+                          priceCompare.diff > 0
+                            ? 'text-costco-red-600'
+                            : priceCompare.diff < 0
+                              ? 'text-green-600'
+                              : 'text-slate-500'
+                        }`}
+                      >
+                        {priceCompare.diff === 0
+                          ? '変わらず'
+                          : `${priceCompare.diff > 0 ? '+' : ''}${formatYen(priceCompare.diff)}円(${priceCompare.percent > 0 ? '+' : ''}${priceCompare.percent.toFixed(0)}%)`}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs text-slate-400">
+                      {formatDate(priceCompare.previousDate)}(¥{formatYen(priceCompare.previous)}) → {formatDate(priceCompare.latestDate)}
+                      (¥{formatYen(priceCompare.latest)})
+                    </p>
+                  </>
+                )}
+                {avgUnitPrice !== null && (
+                  <p className={priceCompare ? 'mt-2 border-t border-slate-200 pt-2 text-xs text-slate-500' : 'text-xs text-slate-500'}>
+                    平均購入単価(内容量あたり) <span className="font-semibold text-slate-700">¥{formatYen(avgUnitPrice)}</span>
+                  </p>
+                )}
               </div>
             )}
 
