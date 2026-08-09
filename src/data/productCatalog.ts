@@ -1,8 +1,6 @@
 // costcotuu.com のカテゴリ別商品レビュー記事一覧から生成した、商品名の候補データベース。
-// 【白紙化にあたっての注記】これを使っていた入力補助機能・データモデルは
-// 企画の見直しにあたり削除したため、現在このファイルはどこからも
-// 参照されていない(未使用)。商品名・カテゴリの参考データとして
-// 削除せず残してあるので、今後の企画で再利用する場合はここから使える。
+// src/screens/ListScreen.tsx の定番商品登録フォーム(AddProductSheet)で、
+// 商品名・カテゴリの入力補助(候補表示)に使っている。
 export type CatalogEntry = { name: string; category: string }
 
 export const PRODUCT_CATALOG: CatalogEntry[] = [
