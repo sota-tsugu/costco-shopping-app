@@ -4,6 +4,8 @@ import { useTripStore, fetchLastCompletedTripTotal } from '../store/tripStore'
 import { TricolorAccent } from '../components/TricolorAccent'
 import { BarcodeScanSheet } from '../components/BarcodeScanSheet'
 import { CartFillDisplay } from '../components/CartFillDisplay'
+import { TripStageIndicator } from '../components/TripStageIndicator'
+import { ScreenPageDots } from '../components/ScreenPageDots'
 
 // 画面B:カートのビジュアル確認画面(ホーム/メイン画面・会計の入り口)。
 // 「カートそのものに集中する」画面。一覧・編集は画面Aに集約したので、
@@ -71,7 +73,11 @@ export function CartScreen({ onBack }: Props) {
     <div className="flex min-h-screen flex-col bg-slate-50">
       <header className="bg-costco-blue-700 px-4 pb-4 pt-4 text-white shadow-md">
         <TricolorAccent />
-        <div className="mt-3 flex items-center justify-between gap-2">
+        <div className="mt-3 flex items-center justify-between">
+          <TripStageIndicator stage="active" />
+          <ScreenPageDots active="cart" />
+        </div>
+        <div className="mt-2 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <button
               onClick={onBack}

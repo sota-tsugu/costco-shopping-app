@@ -10,6 +10,8 @@ import {
 import { SettingsModal } from './SettingsModal'
 import { TricolorAccent } from '../components/TricolorAccent'
 import { ProductHistorySheet } from '../components/ProductHistorySheet'
+import { TripStageIndicator } from '../components/TripStageIndicator'
+import { ScreenPageDots } from '../components/ScreenPageDots'
 import { PRODUCT_CATALOG } from '../data/productCatalog'
 
 // 画面A:今回買うものリスト画面。
@@ -213,6 +215,10 @@ export function ListScreen({ onOpenCart }: Props) {
       <header className="bg-costco-blue-700 px-4 pb-4 pt-4 text-white shadow-md">
         <TricolorAccent />
         <div className="mt-3 flex items-center justify-between">
+          <TripStageIndicator stage={isPlanning ? 'planning' : 'active'} />
+          {isActive && <ScreenPageDots active="list" />}
+        </div>
+        <div className="mt-2 flex items-center justify-between">
           <h1 className="text-base font-semibold">今回買うものリスト</h1>
           <div className="flex items-center gap-1">
             {/* 計画中は空っぽ(薄い色・バッジ無し)、買い物中は商品が入り
