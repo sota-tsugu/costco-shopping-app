@@ -4,8 +4,8 @@
 //
 // 【演出の流れ】赤白のストライプと格子状のカートが斜めに勢いよく
 // 滑り込み、「COSTCO GO」の文字が浮かんだ後にフェードアウトし、
-// 中央に白い丸バッジ(COSTCO GO)がポップインする。バッジをタップすると
-// 今回買うものリストへ進む。
+// 中央に白い丸バッジ(大きく太い「GO」の文字)がポップインする。
+// バッジをタップすると今回買うものリストへ進む。
 //
 // 【デザイン上の注意】コストコの公式ロゴ(斜めストライプの商標デザイン)
 // はそのまま使わず、独自の配色・文字組みだけで「勢いのある雰囲気」を
@@ -61,8 +61,7 @@ export function SplashScreen({ onContinue }: Props) {
         onClick={onContinue}
         className="splash-badge absolute left-1/2 top-1/2 flex h-48 w-48 flex-col items-center justify-center rounded-full bg-white shadow-lg active:scale-95"
       >
-        <span className="text-4xl font-black leading-tight text-costco-blue-800">COSTCO</span>
-        <span className="mt-0.5 text-3xl font-black leading-tight text-costco-red-600">GO</span>
+        <span className="text-8xl font-black leading-none text-costco-red-600">GO</span>
       </button>
     </div>
   )
