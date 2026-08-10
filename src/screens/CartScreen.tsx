@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, CheckCircle2, Camera, TrendingUp, TrendingDown, Minus, AlertTriangle, X } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, Camera, TrendingUp, TrendingDown, Minus, AlertTriangle, X, ShoppingCart } from 'lucide-react'
 import { useTripStore, fetchLastCompletedTripTotal, type TripItem } from '../store/tripStore'
 import { TricolorAccent } from '../components/TricolorAccent'
 import { BarcodeScanSheet } from '../components/BarcodeScanSheet'
@@ -94,7 +94,8 @@ export function CartScreen({ onBack }: Props) {
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
-      <header className="bg-costco-blue-700 px-4 pb-4 pt-4 text-white shadow-md">
+      <header className="relative overflow-hidden bg-costco-blue-900 px-4 pb-4 pt-4 text-white shadow-md">
+        <ShoppingCart aria-hidden="true" className="pointer-events-none absolute -bottom-3 -right-3 h-24 w-24 text-white/5" />
         <TricolorAccent />
         <div className="mt-3 flex items-center justify-between">
           <TripStageIndicator stage="active" startedAt={currentTrip?.startedAt} />

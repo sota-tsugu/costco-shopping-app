@@ -251,7 +251,14 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
 
   return (
     <div className={`min-h-screen bg-slate-50 ${isPlanning && products.length > 0 ? 'pb-28' : 'pb-8'}`}>
-      <header className="bg-costco-blue-700 px-4 pb-4 pt-4 text-white shadow-md">
+      <header
+        className={`relative overflow-hidden px-4 pb-4 pt-4 text-white shadow-md transition-colors ${
+          isActive ? 'bg-costco-blue-900' : 'bg-costco-blue-700'
+        }`}
+      >
+        {isActive && (
+          <ShoppingCart aria-hidden="true" className="pointer-events-none absolute -bottom-3 -right-3 h-24 w-24 text-white/5" />
+        )}
         <TricolorAccent />
         <div className="mt-3 flex items-center justify-between">
           <TripStageIndicator stage={isPlanning ? 'planning' : 'active'} startedAt={currentTrip?.startedAt} />
