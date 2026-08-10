@@ -5,9 +5,13 @@ import { LineChart, formatYen, type LineChartPoint } from './LineChart'
 import { toDigitsOnly, formatWithCommas } from '../utils/numberInput'
 
 // 商品ごとの詳細シート:単価比較・購入履歴・購入頻度を表示する。
-// 画面Aの買い物中(active)リストで商品名をタップすると開く
-// (「カートに入れる」ボタンとは別の入口。costco_app_concept_v3.mdの
-// 「3. 履歴・比較機能」を参照)。
+// (costco_app_concept_v3.mdの「3. 履歴・比較機能」を参照)。
+// 開ける場所は3箇所:
+// - 画面Aの計画中リスト(商品名の横の折れ線グラフアイコン)。
+//   買う前に価格の推移を確認できるようにするための入口
+// - 画面Aの買い物中リスト(商品名のタップ)
+// - 画面C購入履歴の、購入日を選んだ先の商品一覧(商品名のタップ)。
+//   購入履歴を眺めながら価格を振り返りたい場面に対応
 //
 // 【単価比較の考え方】内容量(amount)が分かっている記録同士で、
 // 内容量あたりの単価(price / amount)を比較する。パッケージサイズが

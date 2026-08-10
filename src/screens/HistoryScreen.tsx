@@ -8,6 +8,7 @@ import {
 } from '../store/tripStore'
 import { TricolorAccent } from '../components/TricolorAccent'
 import { LineChart, type LineChartPoint } from '../components/LineChart'
+import { ProductHistorySheet } from '../components/ProductHistorySheet'
 
 // 画面C:購入履歴・レポート画面(いつでも振り返れる画面)。
 // 買い物の前後に関わらず、いつでも過去の記録を振り返れる画面として、
@@ -28,6 +29,11 @@ import { LineChart, type LineChartPoint } from '../components/LineChart'
 // 検索欄を設けている(costco_app_concept_v3.mdの「商品ごとに絞り込んで
 // 見られるものと、全体を通しで見られるものの両方を想定」に対応)。
 // 年間利用額・推移グラフは全体の集計のままで、絞り込みの対象にはしていない
+//
+// 【単価比較シートへの導線】購入日を選んだ先の商品一覧で、商品名を
+// タップするとProductHistorySheet(単価比較・購入履歴)が開く。以前は
+// 画面Aの買い物中リストからしか開けず、購入履歴を眺めながら価格を
+// 振り返りたい場面(まさにこの画面)に導線が無かったため追加した
 
 type Props = {
   onBack: () => void
@@ -52,6 +58,7 @@ export function HistoryScreen({ onBack }: Props) {
   const [trips, setTrips] = useState<CompletedTripSummary[] | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
+  const [historyProductName, setHistoryProductName] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -158,20 +165,28 @@ export function HistoryScreen({ onBack }: Props) {
             </p>
             <ul className="space-y-1.5">
               {selectedGroup.entries.map((entry) => (
-                <li key={entry.id} className="flex items-center gap-2 rounded-xl bg-white px-3 py-2.5 shadow-sm">
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm text-slate-800">{entry.productName}</div>
-                    {entry.category && <div className="truncate text-xs text-slate-400">{entry.category}</div>}
-                  </div>
-                  <span className="shrink-0 text-right text-sm text-slate-700">
-                    ¥{entry.price.toLocaleString()}
-                    {entry.amount !== null && (
-                      <span className="block text-xs text-slate-400">
-                        ({entry.amount}{entry.unit ?? ''})
-                      </span>
-                    )}
-                    {entry.quantity > 1 && <span className="block text-xs text-slate-400">×{entry.quantity}</span>}
-                  </span>
+                <li key={entry.id}>
+                  <button
+                    onClick={() => setHistoryProductName(entry.productName)}
+                    className="flex w-full items-center gap-2 rounded-xl bg-white px-3 py-2.5 text-left shadow-sm active:bg-slate-50"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm text-slate-800 underline decoration-slate-300 underline-offset-2">
+                        {entry.productName}
+                      </div>
+                      {entry.category && <div className="truncate text-xs text-slate-400">{entry.category}</div>}
+                    </div>
+                    <span className="shrink-0 text-right text-sm text-slate-700">
+                      ¥{entry.price.toLocaleString()}
+                      {entry.amount !== null && (
+                        <span className="block text-xs text-slate-400">
+                          ({entry.amount}{entry.unit ?? ''})
+                        </span>
+                      )}
+                      {entry.quantity > 1 && <span className="block text-xs text-slate-400">×{entry.quantity}</span>}
+                    </span>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
+                  </button>
                 </li>
               ))}
             </ul>
@@ -287,6 +302,10 @@ export function HistoryScreen({ onBack }: Props) {
           </>
         )}
       </main>
+
+      {historyProductName && (
+        <ProductHistorySheet productName={historyProductName} onClose={() => setHistoryProductName(null)} />
+      )}
     </div>
   )
 }

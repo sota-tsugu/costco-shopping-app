@@ -15,6 +15,7 @@ import {
   AlertTriangle,
   ListChecks,
   CornerUpLeft,
+  TrendingUp,
 } from 'lucide-react'
 import {
   useTripStore,
@@ -440,6 +441,13 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
                           {product.name}
                         </span>
                         <Pencil className="h-3 w-3 shrink-0 text-slate-300" />
+                      </button>
+                      <button
+                        onClick={() => setHistoryProductName(product.name)}
+                        className="shrink-0 rounded-full p-1 text-slate-300 active:text-costco-blue-600"
+                        aria-label="単価の推移・購入履歴を見る"
+                      >
+                        <TrendingUp className="h-3.5 w-3.5" />
                       </button>
                       {checked && consideringItem && (
                         <div className="flex shrink-0 items-center gap-1 rounded-lg bg-slate-100 p-0.5">
