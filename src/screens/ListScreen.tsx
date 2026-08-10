@@ -264,8 +264,12 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
           <TripStageIndicator stage={isPlanning ? 'planning' : 'active'} startedAt={currentTrip?.startedAt} />
           {isActive && <ScreenPageDots active="list" />}
         </div>
-        <div className="mt-2 flex items-center justify-between">
-          <h1 className="text-base font-semibold">今回買うものリスト</h1>
+        <div className={`mt-2 flex items-center ${isActive ? 'justify-end' : 'justify-between'}`}>
+          {/* 買い物中は既にTripStageIndicatorで「買い物中・XX分」と表示され
+              ており、このタイトルと意味が重複するため、買い物中は視覚的には
+              隠す(スクリーンリーダー向けにsr-onlyとしては残す)。空いた
+              スペースは購入履歴ラベルを横並びで見せる余裕にあてている */}
+          <h1 className={isActive ? 'sr-only' : 'text-base font-semibold'}>今回買うものリスト</h1>
           <div className="flex items-center gap-1">
             {/* 計画中は空っぽ(薄い色・バッジ無し)、買い物中は商品が入り
                 始めたことが分かるよう白色+件数バッジで表す。カートの
@@ -281,11 +285,11 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
             </div>
             <button
               onClick={onOpenHistory}
-              className="flex flex-col items-center gap-0.5 rounded-lg px-1.5 py-0.5 text-costco-blue-100 transition-colors hover:bg-costco-blue-600"
+              className="flex items-center gap-1 rounded-full py-1 pl-1.5 pr-2 text-costco-blue-100 transition-colors hover:bg-costco-blue-600"
               aria-label="購入履歴・レポート"
             >
               <ReceiptJapaneseYen className="h-5 w-5" />
-              <span className="whitespace-nowrap text-[9px] font-medium leading-none">購入履歴</span>
+              <span className="whitespace-nowrap text-xs font-medium leading-none">購入履歴</span>
             </button>
             <button
               onClick={() => setIsSettingsOpen(true)}
