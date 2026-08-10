@@ -13,6 +13,8 @@ import {
   History,
   ReceiptJapaneseYen,
   AlertTriangle,
+  ListChecks,
+  CornerUpLeft,
 } from 'lucide-react'
 import {
   useTripStore,
@@ -340,32 +342,46 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
                 <ShoppingCart className="h-4 w-4" />
                 カート {cartCount}点
               </span>
-              <span className="flex items-center gap-1 text-base font-semibold">
+              <span className="flex items-center gap-1.5 text-base font-semibold">
                 ¥{cartTotal.toLocaleString()}
+                {currentTrip && (
+                  <span className="text-xs font-normal text-costco-blue-100">
+                    / 予算¥{currentTrip.budget.toLocaleString()}
+                  </span>
+                )}
                 <ChevronRight className="h-4 w-4" />
               </span>
             </button>
+            {currentTrip && currentTrip.budget > 0 && (
+              <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/15">
+                <div
+                  className={`h-full rounded-full transition-all ${isOverBudgetActive ? 'bg-costco-red-300' : 'bg-white'}`}
+                  style={{ width: `${Math.min((cartTotal / currentTrip.budget) * 100, 100)}%` }}
+                />
+              </div>
+            )}
             {isOverBudgetActive && currentTrip && (
               <p className="mt-1.5 flex items-center gap-1 px-1 text-xs font-medium text-costco-red-200">
                 <AlertTriangle className="h-3.5 w-3.5" />
                 予算を¥{(cartTotal - currentTrip.budget).toLocaleString()}オーバーしています
               </p>
             )}
-            {currentTrip && (
+            <div className="mt-2 flex items-center justify-between">
               <button
                 onClick={() => setIsPlanRecapOpen(true)}
-                className="mt-1.5 flex w-full items-center justify-between px-1 text-xs text-costco-blue-100 active:text-white"
+                className="flex items-center gap-1 px-1 py-1 text-xs text-costco-blue-100 active:text-white"
               >
-                <span>予算 ¥{currentTrip.budget.toLocaleString()}</span>
-                <span className="underline underline-offset-2">計画を見る</span>
+                <ListChecks className="h-3.5 w-3.5" />
+                計画を見る
               </button>
-            )}
-            <button
-              onClick={handleBackToPlanning}
-              className="mt-1 flex w-full items-center justify-end px-1 text-xs text-costco-blue-100 active:text-white"
-            >
-              <span className="underline underline-offset-2">計画中の画面に戻る</span>
-            </button>
+              <button
+                onClick={handleBackToPlanning}
+                className="flex items-center gap-1 rounded-full border border-white/40 bg-white/10 px-3 py-1 text-xs font-medium text-white active:bg-white/20"
+              >
+                <CornerUpLeft className="h-3.5 w-3.5" />
+                計画中の画面に戻る
+              </button>
+            </div>
           </div>
         )}
       </header>

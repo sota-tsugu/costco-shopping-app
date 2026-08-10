@@ -138,8 +138,19 @@ export function CartScreen({ onBack }: Props) {
           >
             ¥{total.toLocaleString()}
           </p>
+          {currentTrip && currentTrip.budget > 0 && (
+            <>
+              <p className="mt-1 text-xs text-slate-400">予算¥{currentTrip.budget.toLocaleString()}のうち</p>
+              <div className="mx-auto mt-1.5 h-1.5 w-full max-w-[220px] overflow-hidden rounded-full bg-slate-100">
+                <div
+                  className={`h-full rounded-full transition-all ${isOverBudget ? 'bg-costco-red-500' : 'bg-costco-blue-500'}`}
+                  style={{ width: `${Math.min((total / currentTrip.budget) * 100, 100)}%` }}
+                />
+              </div>
+            </>
+          )}
           {isOverBudget && currentTrip && (
-            <p className="mt-1 flex items-center justify-center gap-1 text-sm font-medium text-costco-red-600">
+            <p className="mt-1.5 flex items-center justify-center gap-1 text-sm font-medium text-costco-red-600">
               <AlertTriangle className="h-4 w-4" />
               予算(¥{currentTrip.budget.toLocaleString()})を¥{(total - currentTrip.budget).toLocaleString()}オーバー
             </p>
