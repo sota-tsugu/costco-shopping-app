@@ -15,9 +15,10 @@ import { LineChart, type LineChartPoint } from '../components/LineChart'
 // 「2. 画面構成」を参照)。
 //
 // 【表示の考え方】上から、年間利用額→買い物1回ごとの合計金額の推移
-// グラフ→購入日の一覧、という構成にしている。商品単価の変動推移は、
-// 商品ごとの詳細シート(ProductHistorySheet)側にすでにあるため、
-// ここでは扱わない
+// グラフ→購入日の一覧→カテゴリ別の支出割合、という構成にしている。
+// 「いつ・いくら買ったか」という具体的な記録を先に、「傾向」を後に
+// 見せる並び。商品単価の変動推移は、商品ごとの詳細シート
+// (ProductHistorySheet)側にすでにあるため、ここでは扱わない
 //
 // 【購入日ごとの切り替え表示】購入点数が多いと一覧が長くなりすぎるため、
 // まず購入日の一覧(日付・点数・その日の合計)を表示し、日付をタップ
@@ -198,31 +199,6 @@ export function HistoryScreen({ onBack }: Props) {
               </section>
             )}
 
-            {categoryTotals.length > 0 && (
-              <section className="mb-4 rounded-xl bg-white p-4 shadow-sm">
-                <h2 className="mb-2 text-xs font-semibold text-slate-500">カテゴリ別の支出割合</h2>
-                <ul className="space-y-2.5">
-                  {categoryTotals.map(({ category, amount, percent }) => (
-                    <li key={category}>
-                      <div className="mb-1 flex items-center justify-between text-sm">
-                        <span className="text-slate-700">{category}</span>
-                        <span className="text-slate-500">
-                          ¥{amount.toLocaleString()}
-                          <span className="ml-1 text-xs text-slate-400">({percent.toFixed(0)}%)</span>
-                        </span>
-                      </div>
-                      <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                        <div
-                          className="h-2 rounded-full bg-costco-blue-600"
-                          style={{ width: `${percent}%` }}
-                        />
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
-
             {history === null && <p className="text-sm text-slate-400">読み込んでいます…</p>}
 
             {history !== null && history.length === 0 && (
@@ -260,7 +236,7 @@ export function HistoryScreen({ onBack }: Props) {
             )}
 
             {groupedByDate.length > 0 && (
-              <section>
+              <section className="mb-4">
                 <h2 className="mb-1.5 text-xs font-semibold text-slate-500">購入日</h2>
                 <ul className="space-y-1.5">
                   {groupedByDate.map(({ date, entries, total }) => (
@@ -278,6 +254,31 @@ export function HistoryScreen({ onBack }: Props) {
                         </span>
                         <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
                       </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            {categoryTotals.length > 0 && (
+              <section className="rounded-xl bg-white p-4 shadow-sm">
+                <h2 className="mb-2 text-xs font-semibold text-slate-500">カテゴリ別の支出割合</h2>
+                <ul className="space-y-2.5">
+                  {categoryTotals.map(({ category, amount, percent }) => (
+                    <li key={category}>
+                      <div className="mb-1 flex items-center justify-between text-sm">
+                        <span className="text-slate-700">{category}</span>
+                        <span className="text-slate-500">
+                          ¥{amount.toLocaleString()}
+                          <span className="ml-1 text-xs text-slate-400">({percent.toFixed(0)}%)</span>
+                        </span>
+                      </div>
+                      <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                        <div
+                          className="h-2 rounded-full bg-costco-blue-600"
+                          style={{ width: `${percent}%` }}
+                        />
+                      </div>
                     </li>
                   ))}
                 </ul>
