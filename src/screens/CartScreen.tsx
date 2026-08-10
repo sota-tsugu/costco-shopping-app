@@ -95,7 +95,7 @@ export function CartScreen({ onBack }: Props) {
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
       <header className="relative overflow-hidden bg-costco-blue-900 px-4 pb-4 pt-4 text-white shadow-md">
-        <ShoppingCart aria-hidden="true" className="pointer-events-none absolute -bottom-3 -right-3 h-24 w-24 text-white/5" />
+        <ShoppingCart aria-hidden="true" className="pointer-events-none absolute -bottom-3 -right-3 h-24 w-24 text-white/[0.08]" />
         <TricolorAccent />
         <div className="mt-3 flex items-center justify-between">
           <TripStageIndicator stage="active" startedAt={currentTrip?.startedAt} />

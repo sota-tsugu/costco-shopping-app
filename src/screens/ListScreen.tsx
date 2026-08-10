@@ -257,7 +257,7 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
         }`}
       >
         {isActive && (
-          <ShoppingCart aria-hidden="true" className="pointer-events-none absolute -bottom-3 -right-3 h-24 w-24 text-white/5" />
+          <ShoppingCart aria-hidden="true" className="pointer-events-none absolute -bottom-3 -right-3 h-24 w-24 text-white/[0.08]" />
         )}
         <TricolorAccent />
         <div className="mt-3 flex items-center justify-between">
