@@ -1,11 +1,10 @@
 import { useMemo } from 'react'
-import cartImage from '../assets/cart-icon.jpg'
 import cartFrontMesh from '../assets/cart-icon-front.png'
 
-// カート写真(cart-icon.jpg)の中に、カート内商品の点数ぶん絵文字を
-// ランダムに敷き詰めて表示する。写真(746x700px)を実際に計測して求めた、
-// バスケット内側のおおよその範囲(台形の4隅、画像サイズに対する比率)を
-// もとに位置を計算している。
+// カートのイラスト(cart-icon-front.png、背景透明)の中に、カート内商品の
+// 点数ぶん絵文字をランダムに敷き詰めて表示する。元画像(746x700px)を
+// 実際に計測して求めた、バスケット内側のおおよその範囲(台形の4隅、
+// 画像サイズに対する比率)をもとに位置を計算している。
 //
 // 【配置ロジックの考え方】
 // - バスケットの底(手前)からカートの縁に向かって、行ごとに敷き詰めていく
@@ -28,6 +27,13 @@ import cartFrontMesh from '../assets/cart-icon-front.png'
 // 用意し、バスケット内側の範囲(台形)だけを切り抜いて、絵文字の
 // さらに上に重ねている。網目の線がある部分は不透明(商品を隠す)、
 // 線が無い隙間は透明(商品が見える)ため、商品が網目の奥にあるように見える
+//
+// 【土台にも透明背景の画像を使う】以前は土台(一番下のレイヤー)に
+// 白背景のcart-icon.jpgをそのまま使っていたが、画面の背景色
+// (bg-slate-50)とのわずかな色差で、写真の四角い縁が「シールを
+// 貼ったよう」に見えてしまう問題があった(SOTAさんのフィードバックで
+// 判明)。土台にも同じ透明背景のcart-icon-front.pngを使うことで、
+// 四角い縁自体をなくし、カートの形だけが画面に直接浮かんで見えるようにした
 
 const BASKET_TOP_LEFT: [number, number] = [0.0268, 0.2357]
 const BASKET_TOP_RIGHT: [number, number] = [0.7909, 0.0929]
@@ -156,7 +162,7 @@ export function CartFillDisplay({ itemCount }: Props) {
 
   return (
     <div className="relative mx-auto w-full max-w-xs" style={{ containerType: 'inline-size' }}>
-      <img src={cartImage} alt="カート" className="w-full" />
+      <img src={cartFrontMesh} alt="カート" className="w-full" />
       <div className="pointer-events-none absolute inset-0">
         {items.map((item) => (
           <span
