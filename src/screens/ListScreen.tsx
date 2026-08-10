@@ -281,10 +281,11 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
             </div>
             <button
               onClick={onOpenHistory}
-              className="rounded-full p-1 text-costco-blue-100 transition-colors hover:bg-costco-blue-600"
+              className="flex items-center gap-0.5 rounded-full py-1 pl-1.5 pr-2 text-costco-blue-100 transition-colors hover:bg-costco-blue-600"
               aria-label="購入履歴・レポート"
             >
               <ReceiptJapaneseYen className="h-5 w-5" />
+              <span className="text-[11px] font-medium leading-none">購入履歴</span>
             </button>
             <button
               onClick={() => setIsSettingsOpen(true)}
