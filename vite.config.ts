@@ -35,7 +35,7 @@ export default defineConfig({
         scope: `/${REPO_NAME}/`,
         display: 'standalone',
         background_color: '#ffffff',
-        theme_color: '#1e40af',
+        theme_color: '#003564',
         icons: [
           {
             src: 'icons/icon-192.png',
