@@ -97,7 +97,7 @@ export function CartScreen({ onBack }: Props) {
       <header className="bg-costco-blue-700 px-4 pb-4 pt-4 text-white shadow-md">
         <TricolorAccent />
         <div className="mt-3 flex items-center justify-between">
-          <TripStageIndicator stage="active" />
+          <TripStageIndicator stage="active" startedAt={currentTrip?.startedAt} />
           <ScreenPageDots active="cart" />
         </div>
         <div className="mt-2 flex items-center justify-between gap-2">
@@ -119,6 +119,7 @@ export function CartScreen({ onBack }: Props) {
           </button>
         </div>
       </header>
+      <TricolorAccent variant="subtle" />
 
       <main className="flex flex-1 flex-col items-center justify-center px-6 py-8">
         <button

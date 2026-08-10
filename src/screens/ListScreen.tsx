@@ -253,7 +253,7 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
       <header className="bg-costco-blue-700 px-4 pb-4 pt-4 text-white shadow-md">
         <TricolorAccent />
         <div className="mt-3 flex items-center justify-between">
-          <TripStageIndicator stage={isPlanning ? 'planning' : 'active'} />
+          <TripStageIndicator stage={isPlanning ? 'planning' : 'active'} startedAt={currentTrip?.startedAt} />
           {isActive && <ScreenPageDots active="list" />}
         </div>
         <div className="mt-2 flex items-center justify-between">
@@ -385,6 +385,7 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
           </div>
         )}
       </header>
+      {isActive && <TricolorAccent variant="subtle" />}
 
       <main key={isActive ? 'active' : 'planning'} className="screen-fade-in mx-auto max-w-md px-4 py-4">
         {isPlanning && products.length > 0 && (

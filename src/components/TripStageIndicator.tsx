@@ -1,40 +1,63 @@
-// 「計画中→買い物中」という、実際に一方通行な2段階だけを示す非interactive
-// な現在地表示。画面A・画面Bのヘッダーに共通で置く。
+import { useEffect, useState } from 'react'
+
+// 画面Aのヘッダーに置く、計画中/買い物中を示す小さなインジケーター。
+// ドット+接続線の「段階」表示に加えて、買い物中だけ買い物開始からの
+// 経過時間を実際に時を刻ませて表示する。
 //
-// 【設計意図】画面A(リスト)と画面B(カート)は、買い物中という同じ段階の
-// 中で自由に行き来できる2つの見方であり、「リストを終えたらカートに
-// 進む」という順番があるわけではない。段階(計画中/買い物中)はこの
-// コンポーネントで、画面の切り替え(リスト/カート)は別のScreenPageDots
-// コンポーネントで表現し、2つの意味を混同しないようにしている
+// 【なぜ経過時間か】色や形の飾りは計画中・買い物中のどちらでも作れて
+// しまうが、時間が実際に進んでいるかどうかは作り物ではなくその状態の
+// 本質そのもの。計画中は何度見返しても同じ内容だが、買い物中は開始が
+// あり時が進み会計で終わる一度きりのセッションなので、時計そのものに
+// 「今進行中である」ことを語らせている
 //
-// 【見た目についての経緯】当初は「計画中」「買い物中」を横並びのピル型
-// タブのように見せていたが、iOSのセグメントコントロール(タップで
-// 切り替えるUI)に見た目が似ていて、実際にはタップで行き来できないのに
-// 誤解を招く、というSOTAさんのフィードバックを受けて変更した。
-// 丸を線でつないだ、タブ形状ではないステップ表示にすることで、
-// 「タップできそう」に見えないようにしている
+// 【1分ごとの更新】バッテリー消費を抑えるため、秒単位ではなく1分おきに
+// 再計算している。表示も分単位(「買い物中・14分」)にしている
 
 type Props = {
   stage: 'planning' | 'active'
+  /** 買い物開始時刻(ISO文字列)。tripStoreのcurrentTrip.startedAtをそのまま渡す想定 */
+  startedAt?: string | null
 }
 
-export function TripStageIndicator({ stage }: Props) {
+export function TripStageIndicator({ stage, startedAt }: Props) {
   const isActive = stage === 'active'
+  const [elapsedMinutes, setElapsedMinutes] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (!isActive || !startedAt) {
+      setElapsedMinutes(null)
+      return
+    }
+    const startMs = new Date(startedAt).getTime()
+    if (Number.isNaN(startMs)) {
+      setElapsedMinutes(null)
+      return
+    }
+    function tick() {
+      setElapsedMinutes(Math.max(0, Math.floor((Date.now() - startMs) / 60000)))
+    }
+    tick()
+    const id = setInterval(tick, 60000)
+    return () => clearInterval(id)
+  }, [isActive, startedAt])
 
   return (
-    <div className="flex items-center gap-1.5" aria-hidden="true">
+    <div className="flex items-center gap-1.5">
       <span
+        aria-hidden="true"
+        className={`rounded-full transition-all ${!isActive ? 'h-2.5 w-2.5 bg-white ring-2 ring-white/20' : 'h-2 w-2 bg-white/35'}`}
+      />
+      <span aria-hidden="true" className="h-px w-5 bg-white/35" />
+      <span
+        aria-hidden="true"
         className={`rounded-full transition-all ${
-          !isActive ? 'h-2.5 w-2.5 bg-white ring-2 ring-white/20' : 'h-2 w-2 bg-white/35'
+          isActive ? 'h-2.5 w-2.5 animate-pulse bg-white ring-2 ring-white/20' : 'h-2 w-2 bg-white/35'
         }`}
       />
-      <span className="h-px w-5 bg-white/35" />
-      <span
-        className={`rounded-full transition-all ${
-          isActive ? 'h-2.5 w-2.5 bg-white ring-2 ring-white/20' : 'h-2 w-2 bg-white/35'
-        }`}
-      />
-      <span className="ml-1 text-xs font-medium text-white">{isActive ? '買い物中' : '計画中'}</span>
+      <span className="ml-1 text-xs font-medium text-white">
+        {isActive ? '買い物中' : '計画中'}
+        {isActive && elapsedMinutes !== null && <span className="text-white/70">・{elapsedMinutes}分</span>}
+      </span>
     </div>
   )
 }
