@@ -304,18 +304,23 @@ function drawReceiptToCanvas(
   ctx.fillText(dateLine, WIDTH / 2, y)
   y += 14 * SCALE
 
-  function dashedLine(yPos: number) {
-    ctx.save()
-    ctx.strokeStyle = '#999'
-    ctx.setLineDash([4 * SCALE, 3 * SCALE])
-    ctx.beginPath()
-    ctx.moveTo(PADDING, yPos)
-    ctx.lineTo(WIDTH - PADDING, yPos)
-    ctx.stroke()
-    ctx.restore()
+  // 【TypeScriptの制約への対応】この関数の外側で定義しているctxを
+  // そのまま使うと、「if (!ctx) return」でnullではないと確認済みでも、
+  // 関数(クロージャ)をまたぐとTypeScriptがその確認を覚えていてくれず
+  // 「ctxはnullかもしれない」というビルドエラーになる。そのため、
+  // ctxを引数として明示的に受け取る形にしている
+  function dashedLine(context: CanvasRenderingContext2D, yPos: number) {
+    context.save()
+    context.strokeStyle = '#999'
+    context.setLineDash([4 * SCALE, 3 * SCALE])
+    context.beginPath()
+    context.moveTo(PADDING, yPos)
+    context.lineTo(WIDTH - PADDING, yPos)
+    context.stroke()
+    context.restore()
   }
 
-  dashedLine(y)
+  dashedLine(ctx, y)
   y += 14 * SCALE
 
   // 品目一覧
@@ -345,7 +350,7 @@ function drawReceiptToCanvas(
   }
 
   y += 4 * SCALE
-  dashedLine(y)
+  dashedLine(ctx, y)
   y += 18 * SCALE
 
   ctx.fillStyle = INK
@@ -381,7 +386,7 @@ function drawReceiptToCanvas(
   }
 
   y += 8 * SCALE
-  dashedLine(y)
+  dashedLine(ctx, y)
   y += 20 * SCALE
 
   ctx.fillStyle = '#666'
