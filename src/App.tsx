@@ -52,6 +52,7 @@ function App() {
 
   const init = useTripStore((state) => state.init)
   const currentTrip = useTripStore((state) => state.currentTrip)
+  const tripItems = useTripStore((state) => state.tripItems)
   const errorMessage = useTripStore((state) => state.errorMessage)
 
   const touchStart = useRef<{ x: number; y: number } | null>(null)
@@ -93,7 +94,18 @@ function App() {
   const effectiveView =
     view === 'history' ? 'history' : isActive || isSettlingCheckout || pendingReceipt ? view : 'list'
 
+  // カート画面へ遷移する前に、カートが空(0点)であれば一言アラートで
+  // 知らせる。空のままカート画面を見て「あれ、何も入っていない?」と
+  // 戸惑うより、遷移する前に気づける方が親切なため
   function goTo(next: 'list' | 'cart' | 'history') {
+    if (next === 'cart') {
+      const cartItemCount = tripItems
+        .filter((item) => item.status === 'inCart')
+        .reduce((sum, item) => sum + item.quantity, 0)
+      if (cartItemCount === 0) {
+        window.alert('カートが空です')
+      }
+    }
     setView((prev) => {
       if (prev === next) return prev
       setTransitionKey((k) => k + 1)

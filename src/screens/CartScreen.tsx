@@ -129,10 +129,9 @@ export function CartScreen({
         lastTripTotal,
       }
       await completeCheckout()
-      // カートが空になった画面(¥0・0点)をはっきり目にしてから、
-      // レシートをポップさせる。以前は0.5秒にしていたが「一瞬すぎて
-      // 確認できない」とのことだったため、1.5秒に伸ばした
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      // カートが空になった画面(¥0・0点)を一瞬見せてから、レシートを
+      // ポップさせる。1.5秒にしていたが、0.5秒に戻した
+      await new Promise((resolve) => setTimeout(resolve, 500))
       onCheckoutComplete(receiptData)
     } catch (error) {
       // 会計の完了に失敗した場合、これまでは何も表示されず「買い物中」の
@@ -204,17 +203,13 @@ export function CartScreen({
         <CartFillDisplay itemCount={itemCount} />
 
         <div className="mt-4 text-center">
-          {itemCount === 0 ? (
-            <p className="text-lg font-semibold text-slate-400">カートが空です</p>
-          ) : (
-            <p className="text-sm text-slate-500">カート内 {itemCount}点</p>
-          )}
+          <p className="text-sm text-slate-500">カート内 {itemCount}点</p>
           <p
             className={`text-4xl font-semibold tracking-tight ${isOverBudget ? 'text-costco-red-600' : 'text-slate-800'}`}
           >
             ¥{total.toLocaleString()}
           </p>
-          {currentTrip && currentTrip.budget > 0 && itemCount > 0 && (
+          {currentTrip && currentTrip.budget > 0 && (
             <>
               <p className="mt-1 text-xs text-slate-400">予算¥{currentTrip.budget.toLocaleString()}のうち</p>
               <div className="mx-auto mt-1.5 h-1.5 w-full max-w-[220px] overflow-hidden rounded-full bg-slate-100">
