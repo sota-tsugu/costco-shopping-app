@@ -460,7 +460,7 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
                   他の要素より大きく太くして視覚的な主役にしている
                   (画面Bのカート画面と表現を揃え、アプリ全体の一貫性も
                   持たせている) */}
-              <span className="text-xl font-bold leading-tight text-white">
+              <span className="mt-1 text-xl font-bold leading-tight text-white">
                 ¥{cartTotal.toLocaleString()}
               </span>
             </button>
