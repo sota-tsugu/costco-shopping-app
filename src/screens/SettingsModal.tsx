@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { X, RefreshCw, Loader2, Users, Copy, Check, LogOut, Trash2, Wrench } from 'lucide-react'
+import { X, RefreshCw, Loader2, Users, Copy, Check, LogOut, Trash2, Wrench, HelpCircle } from 'lucide-react'
 import { forceUpdateApp } from '../utils/appUpdate'
 import { forgetHousehold, getSavedHouseholdId } from '../firebase/household'
 import { useTripStore, resetStuckTrips } from '../store/tripStore'
+import { HelpModal } from './HelpModal'
 
 // アプリの設定画面(モーダル)。
 // 「アプリを最新の状態に更新する」ボタンと、この端末が今どの家族コードに
@@ -22,6 +23,7 @@ export function SettingsModal({ onClose }: Props) {
   const [isCopied, setIsCopied] = useState(false)
   const [isClearingProducts, setIsClearingProducts] = useState(false)
   const [isResettingTrip, setIsResettingTrip] = useState(false)
+  const [isHelpOpen, setIsHelpOpen] = useState(false)
   const householdId = getSavedHouseholdId()
   const products = useTripStore((state) => state.products)
   const clearAllProducts = useTripStore((state) => state.clearAllProducts)
@@ -103,6 +105,14 @@ export function SettingsModal({ onClose }: Props) {
             <X className="h-5 w-5" />
           </button>
         </div>
+
+        <button
+          onClick={() => setIsHelpOpen(true)}
+          className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl border border-costco-blue-200 bg-white px-4 py-2.5 text-sm font-medium text-costco-blue-700 shadow-sm"
+        >
+          <HelpCircle className="h-4 w-4" />
+          使い方・よくある質問
+        </button>
 
         <div className="mb-4 rounded-lg bg-slate-50 p-4">
           <div className="mb-2 flex items-center gap-1.5 text-sm font-medium text-slate-600">
@@ -188,6 +198,8 @@ export function SettingsModal({ onClose }: Props) {
           </button>
         </div>
       </div>
+
+      {isHelpOpen && <HelpModal onClose={() => setIsHelpOpen(false)} />}
     </div>
   )
 }
