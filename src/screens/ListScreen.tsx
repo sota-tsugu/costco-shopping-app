@@ -1399,6 +1399,24 @@ function TripPlanSheet({ plannedDate, storeName, showMissingWarning, onClose, on
           />
         )}
 
+        {/* まだはっきり決まっていない時に、一旦未入力の状態に戻すための
+            ボタン。ここではフォームの入力内容をその場でクリアするだけで、
+            実際にFirestoreへ反映されるのは下の「保存する」を押した時点
+            (誤タップしてもそのまま保存ボタンを押さなければ影響が無い) */}
+        {(date !== '' || selectedStore !== '') && (
+          <button
+            type="button"
+            onClick={() => {
+              setDate('')
+              setSelectedStore('')
+              setCustomStore('')
+            }}
+            className="mt-3 text-xs text-slate-400 underline underline-offset-2 active:text-slate-600"
+          >
+            予定日・店舗をリセットする
+          </button>
+        )}
+
         <button
           onClick={handleSave}
           className="mt-5 flex w-full items-center justify-center gap-1.5 rounded-xl bg-costco-blue-600 px-4 py-3 text-sm font-semibold text-white active:bg-costco-blue-700"
