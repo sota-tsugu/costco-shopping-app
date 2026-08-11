@@ -798,3 +798,35 @@ export async function fetchAllCompletedTrips(): Promise<CompletedTripSummary[]> 
     }))
     .sort((a, b) => (a.completedAt < b.completedAt ? -1 : 1))
 }
+
+/**
+ * 「進行中(planning/active)」として残っているトリップを、すべて
+ * 削除して初期状態に戻す。一連の不具合調査の過程で、古い・壊れた
+ * トリップがFirestore上に複数残ってしまった可能性があるための、
+ * 設定画面からの手動リセット機能。
+ *
+ * 完了済み(completed)のトリップ・購入履歴には一切触れないため、
+ * 過去の記録は消えない。削除後、アプリを開き直すと
+ * ensurePlanningTrip側で新しい計画中トリップが自動的に作られる
+ */
+export async function resetStuckTrips(): Promise<number> {
+  const householdId = requireHouseholdId()
+  const tripsSnapshot = await getDocs(
+    query(householdCollection(householdId, 'shoppingTrips'), where('status', 'in', ['planning', 'active'])),
+  )
+  if (tripsSnapshot.empty) return 0
+
+  const batch = writeBatch(db)
+  for (const tripDoc of tripsSnapshot.docs) {
+    // このトリップに属するtripItemsも合わせて削除する
+    const itemsSnapshot = await getDocs(
+      query(householdCollection(householdId, 'tripItems'), where('tripId', '==', tripDoc.id)),
+    )
+    for (const itemDoc of itemsSnapshot.docs) {
+      batch.delete(itemDoc.ref)
+    }
+    batch.delete(tripDoc.ref)
+  }
+  await batch.commit()
+  return tripsSnapshot.docs.length
+}
