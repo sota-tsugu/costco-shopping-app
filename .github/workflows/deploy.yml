@@ -29,6 +29,22 @@ jobs:
         with:
           node-version: 22
 
+      # 依存パッケージ(node_modules)をキャッシュし、package.jsonの内容が
+      # 変わっていなければ再利用することで、npm installを毎回ゼロから
+      # やり直さずに済むようにしている(ビルド時間の短縮)。
+      # 【注意】package-lock.jsonが無い(生成されていない)ため、
+      # actions/setup-nodeの標準キャッシュ機能(lockファイル必須)は
+      # 使えず、package.jsonのハッシュ値をキーにした手動キャッシュに
+      # している。package.jsonを変更した回のビルドは、通常通り時間が
+      # かかる点に注意
+      - name: 依存パッケージをキャッシュ
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-modules-
+
       - name: 依存パッケージをインストール
         run: npm install
 
