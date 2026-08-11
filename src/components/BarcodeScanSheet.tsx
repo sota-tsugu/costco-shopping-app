@@ -165,6 +165,24 @@ export function BarcodeScanSheet({ existingProducts, onClose, onSubmit }: Props)
     setPhase('confirming')
   }
 
+  // パン・惣菜・量り売りなど、そもそもバーコードが無い/読み取れない
+  // 商品向けに、スキャンを経由せず直接入力画面に進めるようにする
+  // (カメラ自体が使えない場合の代替手段としても、camera-error画面から
+  // 呼べるようにしている)
+  function handleManualEntry() {
+    stopCamera()
+    setBarcode('')
+    setLookupMatched(false)
+    setLookupNote('バーコードなしで手入力で追加します。商品名・価格を入力してください。')
+    setName('')
+    setCategory('')
+    setPrice('')
+    setAmount('')
+    setUnit('')
+    setQuantity('1')
+    setPhase('confirming')
+  }
+
   const categoryOptions = useMemo(() => {
     const set = new Set<string>()
     for (const p of existingProducts) {
@@ -206,9 +224,15 @@ export function BarcodeScanSheet({ existingProducts, onClose, onSubmit }: Props)
         <div className="relative flex flex-1 items-center justify-center overflow-hidden bg-black">
           <video ref={videoRef} className="h-full w-full object-cover" muted playsInline autoPlay />
           <div className="pointer-events-none absolute inset-x-10 top-1/2 h-24 -translate-y-1/2 rounded-2xl border-2 border-white/80" />
-          <p className="absolute bottom-8 left-0 right-0 text-center text-sm text-white/80">
-            商品のバーコードを枠内に合わせてください
-          </p>
+          <div className="absolute bottom-6 left-0 right-0 flex flex-col items-center gap-3 px-6">
+            <p className="text-center text-sm text-white/80">商品のバーコードを枠内に合わせてください</p>
+            <button
+              onClick={handleManualEntry}
+              className="rounded-full border border-white/40 bg-black/30 px-4 py-2 text-xs text-white active:bg-white/10"
+            >
+              バーコードが無い商品は手入力で追加
+            </button>
+          </div>
         </div>
       )}
 
@@ -218,7 +242,13 @@ export function BarcodeScanSheet({ existingProducts, onClose, onSubmit }: Props)
           <p className="text-sm text-white/80">
             カメラを起動できませんでした。ブラウザの設定でカメラへのアクセスが許可されているか確認してください。
           </p>
-          <button onClick={onClose} className="mt-2 rounded-xl bg-white/10 px-4 py-2 text-sm">
+          <button
+            onClick={handleManualEntry}
+            className="mt-2 rounded-xl bg-white text-slate-800 px-4 py-2 text-sm font-medium active:bg-slate-100"
+          >
+            手入力で追加する
+          </button>
+          <button onClick={onClose} className="rounded-xl bg-white/10 px-4 py-2 text-sm">
             閉じる
           </button>
         </div>
@@ -241,7 +271,7 @@ export function BarcodeScanSheet({ existingProducts, onClose, onSubmit }: Props)
               {lookupNote}
             </p>
           )}
-          <p className="mb-3 text-xs text-slate-400">バーコード: {barcode}</p>
+          {barcode && <p className="mb-3 text-xs text-slate-400">バーコード: {barcode}</p>}
 
           <label className="mb-1 block text-xs font-medium text-slate-500">商品名</label>
           <input

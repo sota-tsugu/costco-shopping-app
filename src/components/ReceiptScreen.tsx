@@ -97,6 +97,28 @@ function tornEdgeClipPath(teeth: number): string {
   return `polygon(${points.join(', ')})`
 }
 
+// tornEdgeClipPathと全く同じ形(上下3%分をギザギザにした紙の形)を、
+// Canvas画像用にパスとして描いて塗りつぶす。CSSのclip-pathはCanvas
+// 描画には反映されないため、画像保存用に同じ計算を別途行っている
+function drawTornEdgeBackground(context: CanvasRenderingContext2D, width: number, height: number, teeth: number) {
+  const step = width / teeth
+  const band = height * 0.03
+  context.beginPath()
+  context.moveTo(0, band)
+  for (let i = 0; i <= teeth; i++) {
+    const x = i * step
+    context.lineTo(x, i % 2 === 0 ? 0 : band)
+  }
+  context.lineTo(width, height - band)
+  for (let i = teeth; i >= 0; i--) {
+    const x = i * step
+    context.lineTo(x, i % 2 === 0 ? height : height - band)
+  }
+  context.closePath()
+  context.fillStyle = PAPER_BG
+  context.fill()
+}
+
 export function ReceiptScreen({ data, onClose }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const elapsed = formatElapsedMinutes(data.startedAt, data.completedAt)
@@ -270,9 +292,13 @@ function drawReceiptToCanvas(
   const ctx = canvas.getContext('2d')
   if (!ctx) return
 
-  // 背景
-  ctx.fillStyle = PAPER_BG
-  ctx.fillRect(0, 0, WIDTH, HEIGHT)
+  // 背景(紙を千切ったような上下のギザギザ形に切り抜いて塗る)。
+  // 画面表示側(JSX)はCSSのclip-path(tornEdgeClipPath)で見た目だけ
+  // 切り抜いているが、Canvas画像化では見た目そのものを別途描く必要が
+  // あるため、同じ形をパスとして描いてから塗りつぶす。canvasの背景は
+  // 元々透明なので、この形の外側は保存画像でも透明になる
+  // (画面上は黒背景の上に乗っているため、そこだけ見えていた形)
+  drawTornEdgeBackground(ctx, WIDTH, HEIGHT, 20)
 
   let y = PADDING
 
