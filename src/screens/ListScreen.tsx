@@ -401,7 +401,7 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
           <div className="mt-3">
             <button
               onClick={onOpenCart}
-              className={`flex w-full flex-col items-stretch rounded-xl px-3 py-2.5 text-left transition-colors ${
+              className={`flex w-full flex-col items-stretch rounded-xl px-3 py-1.5 text-left transition-colors ${
                 isOverBudgetActive
                   ? 'bg-costco-red-700 active:bg-costco-red-800'
                   : 'bg-costco-blue-600 active:bg-costco-blue-800'
@@ -432,13 +432,13 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
                   他の要素より大きく太くして視覚的な主役にしている
                   (画面Bのカート画面と表現を揃え、アプリ全体の一貫性も
                   持たせている) */}
-              <span className="mt-0.5 text-xl font-bold leading-tight text-white">
+              <span className="text-xl font-bold leading-tight text-white">
                 ¥{cartTotal.toLocaleString()}
               </span>
             </button>
             {budgetUsagePercent !== null && (
               <div className="mt-1.5 flex items-center gap-2">
-                <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/15">
+                <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/15">
                   <div
                     className={`h-full rounded-full transition-all ${
                       budgetUsagePercent > 100
