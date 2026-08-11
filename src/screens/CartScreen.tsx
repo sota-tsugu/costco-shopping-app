@@ -5,7 +5,6 @@ import { TricolorAccent } from '../components/TricolorAccent'
 import { BarcodeScanSheet } from '../components/BarcodeScanSheet'
 import { CartFillDisplay } from '../components/CartFillDisplay'
 import { TripStageIndicator } from '../components/TripStageIndicator'
-import { ScreenPageDots } from '../components/ScreenPageDots'
 import type { ReceiptData } from '../components/ReceiptScreen'
 
 // 画面B:カートのビジュアル確認画面(ホーム/メイン画面・会計の入り口)。
@@ -168,9 +167,8 @@ export function CartScreen({
         <TricolorAccent />
         <div className="mt-3 flex items-center justify-between">
           <TripStageIndicator stage="active" startedAt={currentTrip?.startedAt} />
-          <ScreenPageDots active="cart" />
         </div>
-        <div className="mt-2 flex items-center justify-between gap-2">
+        <div className="mt-1 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             {/* アイコンだけでは「別の画面に戻る」ことが伝わりにくいという
                 指摘があったため、行き先を言葉でも明言している */}

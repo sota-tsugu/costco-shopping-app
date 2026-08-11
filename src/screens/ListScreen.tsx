@@ -29,7 +29,6 @@ import { SettingsModal } from './SettingsModal'
 import { TricolorAccent } from '../components/TricolorAccent'
 import { ProductHistorySheet } from '../components/ProductHistorySheet'
 import { TripStageIndicator } from '../components/TripStageIndicator'
-import { ScreenPageDots } from '../components/ScreenPageDots'
 import { PRODUCT_CATALOG } from '../data/productCatalog'
 import { COSTCO_STORES, OTHER_STORE_VALUE } from '../data/costcoStores'
 import { toDigitsOnly, formatWithCommas } from '../utils/numberInput'
@@ -297,9 +296,8 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
         <TricolorAccent />
         <div className="mt-3 flex items-center justify-between">
           <TripStageIndicator stage={isPlanning ? 'planning' : 'active'} startedAt={currentTrip?.startedAt} />
-          {isActive && <ScreenPageDots active="list" />}
         </div>
-        <div className={`mt-2 flex items-center ${isActive ? 'justify-end' : 'justify-between'}`}>
+        <div className={`mt-1 flex items-center ${isActive ? 'justify-end' : 'justify-between'}`}>
           {/* 買い物中は既にTripStageIndicatorで「買い物中・XX分」と表示され
               ており、このタイトルと意味が重複するため、買い物中は視覚的には
               隠す(スクリーンリーダー向けにsr-onlyとしては残す)。空いた
@@ -401,7 +399,7 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
           <div className="mt-3">
             <button
               onClick={onOpenCart}
-              className={`flex w-full flex-col items-stretch rounded-xl px-3 py-1.5 text-left transition-colors ${
+              className={`flex w-full flex-col items-stretch rounded-xl px-3 py-2.5 text-left transition-colors ${
                 isOverBudgetActive
                   ? 'bg-costco-red-700 active:bg-costco-red-800'
                   : 'bg-costco-blue-600 active:bg-costco-blue-800'
