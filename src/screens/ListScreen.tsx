@@ -286,15 +286,15 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
   return (
     <div className={`min-h-screen bg-slate-50 ${isPlanning && products.length > 0 ? 'pb-28' : 'pb-8'}`}>
       <header
-        className={`relative overflow-hidden px-4 pt-4 text-white shadow-md transition-colors ${
-          isActive ? 'bg-costco-blue-900 pb-2' : 'bg-costco-blue-700 pb-4'
+        className={`relative overflow-hidden px-4 text-white shadow-md transition-colors ${
+          isActive ? 'bg-costco-blue-900 pb-2 pt-3' : 'bg-costco-blue-700 pb-4 pt-4'
         }`}
       >
         {isActive && (
           <ShoppingCart aria-hidden="true" className="pointer-events-none absolute -bottom-3 -right-3 h-24 w-24 text-white/[0.08]" />
         )}
         <TricolorAccent />
-        <div className="mt-3 flex items-center justify-between">
+        <div className={`flex items-center justify-between ${isActive ? 'mt-2' : 'mt-3'}`}>
           <TripStageIndicator stage={isPlanning ? 'planning' : 'active'} startedAt={currentTrip?.startedAt} />
         </div>
         <div className={`mt-1 flex items-center ${isActive ? 'justify-end' : 'justify-between'}`}>
@@ -396,7 +396,7 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
         )}
 
         {isActive && (
-          <div className="mt-3">
+          <div className="mt-2">
             <button
               onClick={onOpenCart}
               className={`flex w-full flex-col items-stretch rounded-xl px-3 py-2.5 text-left transition-colors ${
