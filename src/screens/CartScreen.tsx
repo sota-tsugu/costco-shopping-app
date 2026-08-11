@@ -55,6 +55,7 @@ export function CartScreen({ onBack, onCheckoutComplete }: Props) {
   const [isScanOpen, setIsScanOpen] = useState(false)
   const [lastTripTotal, setLastTripTotal] = useState<number | null>(null)
   const [missingItems, setMissingItems] = useState<TripItem[] | null>(null)
+  const [showCheckoutConfirm, setShowCheckoutConfirm] = useState(false)
 
   useEffect(() => {
     void fetchLastCompletedTripTotal().then(setLastTripTotal)
@@ -68,16 +69,24 @@ export function CartScreen({ onBack, onCheckoutComplete }: Props) {
 
   // 「購入する」タップ時のエントリーポイント。今回買うものリストに
   // 入れたまま(検討中の)カートに入れていない商品が残っていれば、
-  // 先に確認シートを挟む。無ければ今まで通りの確認ダイアログのまま
+  // 先に確認シートを挟む。無ければ通常の確認シート(CheckoutConfirmSheet)
+  // を挟む。
+  //
+  // 【OS標準のconfirm()をやめた理由】以前はここでブラウザ標準の
+  // window.confirm()を使っていたが、レシート画面が一度も表示されない
+  // という報告があり、ネイティブダイアログを閉じた直後に別のボタンが
+  // 同じ画面位置に現れることで、その指のタップがそのまま新しいボタン
+  // (レシート画面の「リストへ戻る」など)に伝わってしまう(スマホの
+  // ブラウザでよく知られる挙動)可能性を疑い、確認そのものをアプリ内の
+  // 自作シートに置き換えた。これで会計確認から結果表示まで、OS標準の
+  // ダイアログを一切経由しなくなる
   function handleCheckoutTap() {
     const consideringItems = tripItems.filter((item) => item.status === 'considering')
     if (consideringItems.length > 0) {
       setMissingItems(consideringItems)
       return
     }
-    const confirmed = window.confirm(`買い物を終了しますか?\n合計金額: ¥${total.toLocaleString()}`)
-    if (!confirmed) return
-    void runCheckout()
+    setShowCheckoutConfirm(true)
   }
 
   async function runCheckout() {
@@ -255,6 +264,18 @@ export function CartScreen({ onBack, onCheckoutComplete }: Props) {
           }}
         />
       )}
+
+      {showCheckoutConfirm && (
+        <CheckoutConfirmSheet
+          total={total}
+          isProcessing={isCheckingOut}
+          onCancel={() => setShowCheckoutConfirm(false)}
+          onConfirm={async () => {
+            setShowCheckoutConfirm(false)
+            await runCheckout()
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -304,6 +325,53 @@ function MissingItemsSheet({ items, isProcessing, onCancel, onConfirm }: Missing
         >
           <CheckCircle2 className="h-5 w-5" />
           このまま購入する
+        </button>
+        <button
+          onClick={onCancel}
+          disabled={isProcessing}
+          className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-600 disabled:opacity-50"
+        >
+          やめる
+        </button>
+      </div>
+    </div>
+  )
+}
+
+type CheckoutConfirmSheetProps = {
+  total: number
+  isProcessing: boolean
+  onCancel: () => void
+  onConfirm: () => void
+}
+
+/**
+ * 「購入する」タップ時の、最終確認シート(検討中の商品が残っていない
+ * 通常のケース)。以前はブラウザ標準のwindow.confirm()を使っていたが、
+ * OS標準のダイアログをやめてアプリ内の自作シートに置き換えた
+ * (経緯はhandleCheckoutTapのコメントを参照)
+ */
+function CheckoutConfirmSheet({ total, isProcessing, onCancel, onConfirm }: CheckoutConfirmSheetProps) {
+  return (
+    <div className="fixed inset-0 z-30 flex items-end justify-center bg-black/40 sm:items-center">
+      <div className="w-full max-w-sm rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-2xl">
+        <div className="mb-3 flex items-start justify-between gap-2">
+          <h2 className="text-base font-bold text-slate-800">買い物を終了しますか?</h2>
+          <button onClick={onCancel} className="shrink-0 rounded-full p-1 text-slate-400 hover:bg-slate-100">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <p className="mb-5 text-sm text-slate-500">
+          合計金額: <span className="text-base font-semibold text-slate-800">¥{total.toLocaleString()}</span>
+        </p>
+
+        <button
+          onClick={onConfirm}
+          disabled={isProcessing}
+          className="mb-3 flex w-full items-center justify-center gap-2 rounded-xl bg-green-600 px-4 py-3 font-semibold text-white shadow transition-colors active:bg-green-700 disabled:opacity-50"
+        >
+          <CheckCircle2 className="h-5 w-5" />
+          購入する
         </button>
         <button
           onClick={onCancel}
