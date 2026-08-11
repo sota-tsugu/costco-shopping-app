@@ -485,10 +485,39 @@ export const useTripStore = create<TripStoreState>((set, get) => ({
   },
 
   async completeCheckout() {
-    const { currentTrip, tripItems } = get()
+    const { currentTrip } = get()
     if (!currentTrip) return
     const householdId = requireHouseholdId()
     const now = new Date().toISOString()
+
+    // 会計に使うtripItemsは、ストア上のキャッシュ(get().tripItems)を
+    // そのまま信じるのではなく、この時点でFirestoreから直接
+    // (tripId==currentTrip.idで絞り込んで)取得し直す。会計は実際の
+    // 購入記録・金額に関わる重要な処理のため、リアルタイム購読側に
+    // 万が一の取りこぼしや別トリップのデータ混入があっても影響を
+    // 受けないようにするための、より確実な取得方法にしている
+    const itemsSnapshot = await getDocs(
+      query(householdCollection(householdId, 'tripItems'), where('tripId', '==', currentTrip.id)),
+    )
+    const tripItems: TripItem[] = itemsSnapshot.docs.map((d) => {
+      const data = d.data()
+      return {
+        id: d.id,
+        productId: (data.productId ?? null) as string | null,
+        productName: data.productName as string,
+        category: (data.category ?? null) as string | null,
+        tripId: data.tripId as string,
+        status: data.status as TripItemStatus,
+        price: (data.price ?? null) as number | null,
+        amount: (data.amount ?? null) as number | null,
+        unit: (data.unit ?? null) as string | null,
+        quantity: (data.quantity ?? 1) as number,
+        source: data.source as 'planned' | 'scan',
+        barcode: (data.barcode ?? null) as string | null,
+        createdAt: (data.createdAt ?? '') as string,
+        addedToCartAt: (data.addedToCartAt ?? null) as string | null,
+      }
+    })
 
     const inCartItems = tripItems.filter((item) => item.status === 'inCart')
     const actualTotal = inCartItems.reduce((sum, item) => sum + (item.price ?? 0) * item.quantity, 0)

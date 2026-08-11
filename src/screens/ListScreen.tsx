@@ -220,7 +220,15 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
   // 出てこなくなる(計画時点の完全な記録ではなく、簡易的な参考表示)
   const plannedItems = useMemo(() => tripItems.filter((item) => item.source === 'planned'), [tripItems])
 
+  // 「買い物を始める」は、これまで確認なしで即座に実行していたため、
+  // ゴーストクリック(スマホブラウザで、ボタンが入れ替わる瞬間にタップが
+  // 誤って新しいボタンへ伝わってしまう現象)などで意図せず押されて
+  // しまうと、気づかないまま買い物中の状態になってしまう問題があった。
+  // 会計・計画中へ戻るなど他の重要な操作と同様に、確認ダイアログを
+  // 挟むことで誤操作の影響を防ぐ
   async function handleStartShopping() {
+    const confirmed = window.confirm('買い物を始めますか?')
+    if (!confirmed) return
     await startShopping()
   }
 
