@@ -401,26 +401,32 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
           <div className="mt-3">
             <button
               onClick={onOpenCart}
-              className={`flex w-full items-center justify-between rounded-xl px-3 py-2 transition-colors ${
+              className={`flex w-full flex-col items-stretch rounded-xl px-3 py-2.5 text-left transition-colors ${
                 isOverBudgetActive
                   ? 'bg-costco-red-700 active:bg-costco-red-800'
                   : 'bg-costco-blue-600 active:bg-costco-blue-800'
               }`}
             >
-              <span className="flex items-center gap-1.5 text-sm">
-                <span className="relative shrink-0">
-                  <ShoppingCart className="h-4 w-4" />
-                  {cartCount > 0 && (
-                    <span className="absolute -right-1.5 -top-1.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-costco-red-600 px-1 text-[9px] font-bold leading-none text-white">
-                      {cartCount}
-                    </span>
-                  )}
+              <span className="flex items-center justify-between text-xs text-costco-blue-100">
+                <span className="flex items-center gap-1.5">
+                  <span className="relative shrink-0">
+                    <ShoppingCart className="h-4 w-4" />
+                    {cartCount > 0 && (
+                      <span className="absolute -right-1.5 -top-1.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-costco-red-600 px-1 text-[9px] font-bold leading-none text-white">
+                        {cartCount}
+                      </span>
+                    )}
+                  </span>
+                  カート {cartCount}点
                 </span>
-                カート {cartCount}点
-              </span>
-              <span className="flex items-center gap-1.5 text-base font-semibold">
-                ¥{cartTotal.toLocaleString()}
                 <ChevronRight className="h-4 w-4" />
+              </span>
+              {/* カートの合計金額は、この画面で最も知りたい数字のため、
+                  他の要素より大きく太くして視覚的な主役にしている
+                  (画面Bのカート画面と表現を揃え、アプリ全体の一貫性も
+                  持たせている) */}
+              <span className="mt-0.5 text-3xl font-bold leading-tight text-white">
+                ¥{cartTotal.toLocaleString()}
               </span>
             </button>
             {budgetUsagePercent !== null && (
@@ -456,20 +462,25 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
                 予算を¥{(cartTotal - currentTrip.budget).toLocaleString()}オーバーしています
               </p>
             )}
-            <div className="mt-2 flex items-center justify-between">
+            {/* 「計画を見る」「計画中の画面に戻る」は、上のカートボタンとは
+                役割の重みが違う補助的な操作のため、間隔を空けて視覚的にも
+                グループを分けている。以前は文字だけのリンクと縁取りピルという
+                異なる見た目の組み合わせで重みがちぐはぐだったため、2列の
+                同じ大きさのボタンに揃え、タップ領域も広げた */}
+            <div className="mt-3 grid grid-cols-2 gap-2">
               <button
                 onClick={() => setIsPlanRecapOpen(true)}
-                className="flex items-center gap-1 px-1 py-1 text-xs text-costco-blue-100 active:text-white"
+                className="flex items-center justify-center gap-1.5 rounded-lg border border-white/30 bg-white/5 py-2 text-xs text-costco-blue-100 active:bg-white/15"
               >
                 <ListChecks className="h-3.5 w-3.5" />
                 計画を見る
               </button>
               <button
                 onClick={handleBackToPlanning}
-                className="flex items-center gap-1 rounded-full border border-white/40 bg-white/10 px-3 py-1 text-xs font-medium text-white active:bg-white/20"
+                className="flex items-center justify-center gap-1.5 rounded-lg border border-white/30 bg-white/5 py-2 text-xs text-costco-blue-100 active:bg-white/15"
               >
                 <CornerUpLeft className="h-3.5 w-3.5" />
-                計画中の画面に戻る
+                計画中に戻る
               </button>
             </div>
           </div>
