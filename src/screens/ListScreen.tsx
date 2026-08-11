@@ -287,7 +287,7 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
     <div className={`min-h-screen bg-slate-50 ${isPlanning && products.length > 0 ? 'pb-28' : 'pb-8'}`}>
       <header
         className={`relative overflow-hidden px-4 text-white shadow-md transition-colors ${
-          isActive ? 'bg-costco-blue-900 pb-2 pt-3' : 'bg-costco-blue-700 pb-4 pt-4'
+          isActive ? 'bg-costco-blue-900 pb-1.5 pt-3' : 'bg-costco-blue-700 pb-4 pt-4'
         }`}
       >
         {isActive && (
@@ -297,16 +297,19 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
         <div className={`flex items-center justify-between ${isActive ? 'mt-2' : 'mt-3'}`}>
           <TripStageIndicator stage={isPlanning ? 'planning' : 'active'} startedAt={currentTrip?.startedAt} />
         </div>
-        <div className={`mt-1 flex items-center ${isActive ? 'justify-end' : 'justify-between'}`}>
+        <div className={`mt-0.5 flex items-center ${isActive ? 'justify-end' : 'justify-between'}`}>
           {/* 買い物中は既にTripStageIndicatorで「買い物中・XX分」と表示され
               ており、このタイトルと意味が重複するため、買い物中は視覚的には
               隠す(スクリーンリーダー向けにsr-onlyとしては残す)。空いた
               スペースは購入履歴ラベルを横並びで見せる余裕にあてている */}
           <h1 className={isActive ? 'sr-only' : 'text-base font-semibold'}>今回買うものリスト</h1>
-          <div className="flex items-center gap-1">
+          {/* 購入履歴ボタンは縦積み(アイコン+文字)で設定ボタンより高さが
+              あるため、items-centerのままだと2つのアイコンの高さがずれて
+              見える。items-startにして、両方のアイコンの上端を揃えている */}
+          <div className="flex items-start gap-1">
             <button
               onClick={onOpenHistory}
-              className="flex flex-col items-center gap-0.5 rounded-lg px-1.5 py-0.5 text-costco-blue-100 transition-colors hover:bg-costco-blue-600"
+              className="flex flex-col items-center gap-0.5 rounded-lg px-1.5 py-0 text-costco-blue-100 transition-colors hover:bg-costco-blue-600"
               aria-label="購入履歴・レポート"
             >
               <ReceiptJapaneseYen className="h-5 w-5" />
@@ -396,7 +399,7 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
         )}
 
         {isActive && (
-          <div className="mt-2">
+          <div className="mt-1.5">
             <button
               onClick={onOpenCart}
               className={`flex w-full flex-col items-stretch rounded-xl px-3 py-2.5 text-left transition-colors ${
