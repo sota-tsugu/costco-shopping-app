@@ -6,6 +6,7 @@ import { BarcodeScanSheet } from '../components/BarcodeScanSheet'
 import { CartFillDisplay } from '../components/CartFillDisplay'
 import { TripStageIndicator } from '../components/TripStageIndicator'
 import { ScreenPageDots } from '../components/ScreenPageDots'
+import type { ReceiptData } from '../components/ReceiptScreen'
 
 // 画面B:カートのビジュアル確認画面(ホーム/メイン画面・会計の入り口)。
 // 「カートそのものに集中する」画面。一覧・編集は画面Aに集約したので、
@@ -29,13 +30,21 @@ import { ScreenPageDots } from '../components/ScreenPageDots'
 // 直しようがない場合もあるため)。「このまま購入する」を選ぶと、
 // その検討中の商品はtripStore.completeCheckout()側で削除され、
 // 宙に浮いたデータとして残らないようにしている
+//
+// 【擬似レシート画面】会計完了後、淡々とリスト画面へ戻るだけでは
+// 味気ないため、擬似レシート画面(ReceiptScreen)を一度挟むようにした。
+// このデータはApp.tsx側の状態として持たせているため、会計完了の
+// 直前にスナップショットを作ってonCheckoutCompleteで渡している
+// (詳しい経緯はReceiptScreen.tsxのコメントを参照)
 
 type Props = {
   /** リスト画面(画面A)へ戻る時に呼ぶ */
   onBack: () => void
+  /** 会計完了時に、擬似レシート画面(ReceiptScreen)へ渡すデータとともに呼ぶ */
+  onCheckoutComplete: (data: ReceiptData) => void
 }
 
-export function CartScreen({ onBack }: Props) {
+export function CartScreen({ onBack, onCheckoutComplete }: Props) {
   const tripItems = useTripStore((state) => state.tripItems)
   const products = useTripStore((state) => state.products)
   const currentTrip = useTripStore((state) => state.currentTrip)
@@ -74,7 +83,26 @@ export function CartScreen({ onBack }: Props) {
   async function runCheckout() {
     setIsCheckingOut(true)
     try {
+      // 会計完了後はtripStore側の状態(currentTrip・tripItems)がすぐに
+      // 次の計画中トリップへ切り替わってしまうため、擬似レシートに使う
+      // データは完了「前」の時点でスナップショットとして先に作っておく
+      const receiptData: ReceiptData = {
+        storeName: currentTrip?.storeName ?? null,
+        completedAt: new Date().toISOString(),
+        startedAt: currentTrip?.startedAt ?? null,
+        budget: currentTrip?.budget ?? 0,
+        items: cartItems.map((item) => ({
+          name: item.productName,
+          price: item.price ?? 0,
+          amount: item.amount,
+          unit: item.unit,
+          quantity: item.quantity,
+        })),
+        total,
+        lastTripTotal,
+      }
       await completeCheckout()
+      onCheckoutComplete(receiptData)
     } catch (error) {
       // 会計の完了に失敗した場合、これまでは何も表示されず「買い物中」の
       // 表示が残り続けたまま気づけなかったため、エラーを明示的に伝える

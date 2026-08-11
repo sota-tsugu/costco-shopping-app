@@ -5,6 +5,7 @@ import { ListScreen } from './screens/ListScreen'
 import { CartScreen } from './screens/CartScreen'
 import { HistoryScreen } from './screens/HistoryScreen'
 import { UpdateBanner } from './components/UpdateBanner'
+import { ReceiptScreen, type ReceiptData } from './components/ReceiptScreen'
 import { getSavedHouseholdId } from './firebase/household'
 import { useTripStore } from './store/tripStore'
 
@@ -35,6 +36,11 @@ function App() {
   const [splashDismissed, setSplashDismissed] = useState(false)
   const [view, setView] = useState<'list' | 'cart' | 'history'>('list')
   const [transitionKey, setTransitionKey] = useState(0)
+  // 会計完了直後、tripStore側の状態(currentTrip等)はすぐに次の計画中
+  // トリップへ切り替わり、それに伴い画面もカート→リストへ自動遷移する。
+  // レシート表示はその画面遷移と競合させたくないため、App直下の独立した
+  // 状態として持たせ、リスト画面への遷移とは関係なくオーバーレイ表示する
+  const [pendingReceipt, setPendingReceipt] = useState<ReceiptData | null>(null)
 
   const init = useTripStore((state) => state.init)
   const currentTrip = useTripStore((state) => state.currentTrip)
@@ -111,7 +117,7 @@ function App() {
       <div onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
         <div key={transitionKey} className="screen-fade-in">
           {effectiveView === 'cart' ? (
-            <CartScreen onBack={() => goTo('list')} />
+            <CartScreen onBack={() => goTo('list')} onCheckoutComplete={setPendingReceipt} />
           ) : effectiveView === 'history' ? (
             <HistoryScreen onBack={() => goTo('list')} />
           ) : (
@@ -119,6 +125,8 @@ function App() {
           )}
         </div>
       </div>
+
+      {pendingReceipt && <ReceiptScreen data={pendingReceipt} onClose={() => setPendingReceipt(null)} />}
     </>
   )
 }
