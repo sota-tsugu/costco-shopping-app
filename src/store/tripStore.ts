@@ -12,12 +12,21 @@
 //
 // households/{householdId}/products, .../shoppingTrips, .../tripItems
 // という3つのコレクションを使う。
+//
+// 【計画リスト由来のtripItemsのドキュメントID】パートナーとの同時編集で
+// 同じ商品の行が重複して作られないよう、計画リストからのチェック
+// (togglePlannedProduct)で作るtripItemsだけは、ランダムなID(addDoc)
+// ではなく「トリップID_商品ID」という決まった形式のID(setDoc)を使って
+// いる。バーコードスキャン由来(addScannedItem)は、そもそも複数人が
+// 同時に同じ商品をスキャンする状況が起きにくいため、これまで通り
+// ランダムなIDのままにしている
 
 import { create } from 'zustand'
 import {
   collection,
   doc,
   addDoc,
+  setDoc,
   updateDoc,
   deleteDoc,
   getDocs,
@@ -340,7 +349,21 @@ export const useTripStore = create<TripStoreState>((set, get) => ({
 
     if (selected) {
       const now = new Date().toISOString()
-      await addDoc(householdCollection(householdId, 'tripItems'), {
+      // ドキュメントID(トリップID+商品ID)を決まった形式にすることで、
+      // パートナーと同時に同じ商品をチェックしてしまった場合でも、
+      // 別々のドキュメントが2つできてしまう(重複データ)ことを防いでいる。
+      // addDoc(ランダムなID)だと、お互いの変更がまだ届いていない一瞬の
+      // タイミングで両方が「追加」を実行し、同じ商品の行が裏側で2つ
+      // できてしまう可能性があった。setDoc+決まった形式のIDなら、
+      // 2人が同時に書き込んでも同じ1つのドキュメントを上書きするだけになる。
+      //
+      // 【注意】この仕組みはあくまで「今まさに進行中の1回の買い物」の
+      // 中だけの話で、商品自体の紐付け(過去の購入履歴との照合)は
+      // 引き続き商品名(productName)で行っている。「定番商品リストを
+      // 空にする」機能とは無関係(そちらの経緯はfetchLastCompletedTrip
+      // ProductNamesのコメントを参照)
+      const tripItemId = `${currentTrip.id}_${product.id}`
+      await setDoc(doc(householdCollection(householdId, 'tripItems'), tripItemId), {
         productId: product.id,
         productName: product.name,
         category: product.category,
@@ -356,7 +379,9 @@ export const useTripStore = create<TripStoreState>((set, get) => ({
       })
     } else {
       // considering(検討中)だけでなく、inCart(会計待ち。買い物中に戻ってから
-      // チェックを外した場合)も対象にする
+      // チェックを外した場合)も対象にする。この変更より前に作られた行は
+      // ランダムなIDのままの可能性があるため、決まった形式のIDに決め打ちで
+      // 削除するのではなく、実際に読み込んでいるtripItemsから探して削除する
       const existing = tripItems.find(
         (item) => item.productId === product.id && (item.status === 'considering' || item.status === 'inCart'),
       )
