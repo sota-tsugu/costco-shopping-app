@@ -37,9 +37,11 @@ function App() {
   const [view, setView] = useState<'list' | 'cart' | 'history'>('list')
   const [transitionKey, setTransitionKey] = useState(0)
   // 会計完了直後、tripStore側の状態(currentTrip等)はすぐに次の計画中
-  // トリップへ切り替わり、それに伴い画面もカート→リストへ自動遷移する。
-  // レシート表示はその画面遷移と競合させたくないため、App直下の独立した
-  // 状態として持たせ、リスト画面への遷移とは関係なくオーバーレイ表示する
+  // トリップへ切り替わる。ただし、空になったカート画面を一瞬見せてから
+  // レシートを出したいため、レシート表示中は画面の自動遷移をあえて
+  // 止めている(effectiveViewを参照)。App直下の独立した状態として
+  // 持たせているのは、カート画面が裏で計画中トリップに切り替わっても
+  // レシートの表示自体には影響させないようにするため
   const [pendingReceipt, setPendingReceipt] = useState<ReceiptData | null>(null)
 
   const init = useTripStore((state) => state.init)
@@ -61,17 +63,27 @@ function App() {
   // view自体は'cart'のまま裏に残り続けていたため、次に買い物を始めた
   // 瞬間、その古いviewがそのまま表に出てきて、いきなりカート画面に
   // 飛んでしまう不具合があった(買い物中に一度でもカート画面を開いた
-  // 後、計画中に戻って再度「買い物を始める」を押すと再現する)
+  // 後、計画中に戻って再度「買い物を始める」を押すと再現する)。
+  // ただし、レシート表示中はまだカート画面に留まらせたいため、
+  // pendingReceiptがある間はこのリセットを見送る。レシートを閉じて
+  // pendingReceiptがnullに戻ると、この同じeffectが再度発火して
+  // 正しく'list'にリセットされる(依存配列にpendingReceiptを含めているため)
   useEffect(() => {
-    if (!isActive) {
+    if (!isActive && !pendingReceipt) {
       setView('list')
     }
-  }, [isActive])
+  }, [isActive, pendingReceipt])
 
   // 買い物中(active)でなければ、カート画面を選んでいても常にリスト画面を表示する。
   // 画面C(購入履歴)は「買い物の前後に関わらずいつでも振り返れる」画面のため、
-  // この制約の対象外にしている
-  const effectiveView = view === 'history' ? 'history' : isActive ? view : 'list'
+  // この制約の対象外にしている。
+  //
+  // 【レシート表示中は例外】会計完了直後はisActiveがすぐfalseになるが、
+  // レシート(pendingReceipt)を表示している間は、あえてカート画面(空に
+  // なった状態)に留まらせる。会計完了→即リスト画面、ではなく、
+  // 会計完了→カートが空になった画面を見せる→レシート表示、という
+  // 順番の方が「会計が終わった」という実感を持てるため
+  const effectiveView = view === 'history' ? 'history' : isActive || pendingReceipt ? view : 'list'
 
   function goTo(next: 'list' | 'cart' | 'history') {
     setView((prev) => {
@@ -130,16 +142,7 @@ function App() {
       <div onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
         <div key={transitionKey} className="screen-fade-in">
           {effectiveView === 'cart' ? (
-            <CartScreen
-              onBack={() => goTo('list')}
-              onCheckoutComplete={(data) => {
-                // 【調査用の一時的な目印】レシート画面が表示されない問題の
-                // 切り分けのため、ここに到達しているかどうかを分かりやすく
-                // 表示する。原因が判明次第このアラートは削除する
-                window.alert('DEBUG: 会計完了を検知しました。レシートを表示します。')
-                setPendingReceipt(data)
-              }}
-            />
+            <CartScreen onBack={() => goTo('list')} onCheckoutComplete={setPendingReceipt} />
           ) : effectiveView === 'history' ? (
             <HistoryScreen onBack={() => goTo('list')} />
           ) : (
