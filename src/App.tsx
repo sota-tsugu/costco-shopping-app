@@ -130,7 +130,16 @@ function App() {
       <div onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
         <div key={transitionKey} className="screen-fade-in">
           {effectiveView === 'cart' ? (
-            <CartScreen onBack={() => goTo('list')} onCheckoutComplete={setPendingReceipt} />
+            <CartScreen
+              onBack={() => goTo('list')}
+              onCheckoutComplete={(data) => {
+                // 【調査用の一時的な目印】レシート画面が表示されない問題の
+                // 切り分けのため、ここに到達しているかどうかを分かりやすく
+                // 表示する。原因が判明次第このアラートは削除する
+                window.alert('DEBUG: 会計完了を検知しました。レシートを表示します。')
+                setPendingReceipt(data)
+              }}
+            />
           ) : effectiveView === 'history' ? (
             <HistoryScreen onBack={() => goTo('list')} />
           ) : (
