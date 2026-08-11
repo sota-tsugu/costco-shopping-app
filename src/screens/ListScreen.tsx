@@ -419,7 +419,14 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
                   </span>
                   カート {cartCount}点
                 </span>
-                <ChevronRight className="h-4 w-4" />
+                {/* アイコン・シェブロンの向きだけでは「別の画面に移動する」
+                    ことが伝わりにくいという指摘があったため、行き先を
+                    言葉でも明言している(パートナーなど、初めて触る人にも
+                    分かりやすくするため) */}
+                <span className="flex items-center gap-0.5">
+                  カートを見る
+                  <ChevronRight className="h-4 w-4" />
+                </span>
               </span>
               {/* カートの合計金額は、この画面で最も知りたい数字のため、
                   他の要素より大きく太くして視覚的な主役にしている

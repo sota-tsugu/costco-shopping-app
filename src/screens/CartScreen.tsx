@@ -172,14 +172,15 @@ export function CartScreen({
         </div>
         <div className="mt-2 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
+            {/* アイコンだけでは「別の画面に戻る」ことが伝わりにくいという
+                指摘があったため、行き先を言葉でも明言している */}
             <button
               onClick={onBack}
-              className="rounded-full p-1 text-costco-blue-100 transition-colors hover:bg-costco-blue-600"
-              aria-label="リストへ戻る"
+              className="-ml-1.5 flex items-center gap-1 rounded-full py-1 pl-1.5 pr-2 text-costco-blue-100 transition-colors hover:bg-costco-blue-600"
             >
-              <ArrowLeft className="h-5 w-5" />
+              <ArrowLeft className="h-4 w-4" />
+              <span className="text-xs font-medium">リストに戻る</span>
             </button>
-            <h1 className="text-base font-semibold">カート</h1>
           </div>
           <button
             onClick={handleBackToPlanning}
