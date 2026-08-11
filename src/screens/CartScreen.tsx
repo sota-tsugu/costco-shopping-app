@@ -204,13 +204,17 @@ export function CartScreen({
         <CartFillDisplay itemCount={itemCount} />
 
         <div className="mt-4 text-center">
-          <p className="text-sm text-slate-500">カート内 {itemCount}点</p>
+          {itemCount === 0 ? (
+            <p className="text-lg font-semibold text-slate-400">カートが空です</p>
+          ) : (
+            <p className="text-sm text-slate-500">カート内 {itemCount}点</p>
+          )}
           <p
             className={`text-4xl font-semibold tracking-tight ${isOverBudget ? 'text-costco-red-600' : 'text-slate-800'}`}
           >
             ¥{total.toLocaleString()}
           </p>
-          {currentTrip && currentTrip.budget > 0 && (
+          {currentTrip && currentTrip.budget > 0 && itemCount > 0 && (
             <>
               <p className="mt-1 text-xs text-slate-400">予算¥{currentTrip.budget.toLocaleString()}のうち</p>
               <div className="mx-auto mt-1.5 h-1.5 w-full max-w-[220px] overflow-hidden rounded-full bg-slate-100">
