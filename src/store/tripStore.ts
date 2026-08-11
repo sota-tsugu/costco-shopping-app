@@ -50,6 +50,10 @@ export type ShoppingTrip = {
   completedAt: string | null
   actualTotal: number | null
   createdAt: string
+  /** 行く予定の日(YYYY-MM-DD形式、日付のみ)。計画中に任意で設定する */
+  plannedDate: string | null
+  /** 行く予定/実際に行った店舗名。計画中に任意で設定する */
+  storeName: string | null
 }
 
 /** 検討中(まだカートに入れていない)→会計待ち(カートに入れた)→購入済(会計完了) */
@@ -99,6 +103,8 @@ type TripStoreState = {
   /** 「planning」中のトリップが無ければ新しく作る。あれば何もしない */
   ensurePlanningTrip: (budget: number) => Promise<void>
   updateTripBudget: (budget: number) => Promise<void>
+  /** 行く予定の日・店舗を設定する(どちらもnullで未設定に戻せる) */
+  updateTripPlan: (plannedDate: string | null, storeName: string | null) => Promise<void>
   /** 定番商品を今回買うものリストに入れる/外す(planning中のみ) */
   togglePlannedProduct: (product: Product, selected: boolean) => Promise<void>
   /** 買い物を開始する(planning→active) */
@@ -207,6 +213,8 @@ export const useTripStore = create<TripStoreState>((set, get) => ({
                 completedAt: (data.completedAt ?? null) as string | null,
                 actualTotal: (data.actualTotal ?? null) as number | null,
                 createdAt: (data.createdAt ?? '') as string,
+                plannedDate: (data.plannedDate ?? null) as string | null,
+                storeName: (data.storeName ?? null) as string | null,
               }
             })
             .sort((a, b) => (a.createdAt > b.createdAt ? -1 : 1))
@@ -303,6 +311,8 @@ export const useTripStore = create<TripStoreState>((set, get) => ({
       completedAt: null,
       actualTotal: null,
       createdAt: now,
+      plannedDate: null,
+      storeName: null,
     })
   },
 
@@ -311,6 +321,16 @@ export const useTripStore = create<TripStoreState>((set, get) => ({
     if (!currentTrip) return
     const householdId = requireHouseholdId()
     await updateDoc(doc(householdCollection(householdId, 'shoppingTrips'), currentTrip.id), { budget })
+  },
+
+  async updateTripPlan(plannedDate, storeName) {
+    const { currentTrip } = get()
+    if (!currentTrip) return
+    const householdId = requireHouseholdId()
+    await updateDoc(doc(householdCollection(householdId, 'shoppingTrips'), currentTrip.id), {
+      plannedDate,
+      storeName,
+    })
   },
 
   async togglePlannedProduct(product, selected) {
@@ -680,11 +700,13 @@ export type CompletedTripSummary = {
   id: string
   completedAt: string
   actualTotal: number
+  /** 行った店舗名(計画中に設定していれば)。画面Cの購入履歴で表示するために使う */
+  storeName: string | null
 }
 
 /**
  * 完了した買い物トリップをすべて取得する(古い順)。画面Cの
- * 「買い物1回ごとの合計金額の推移グラフ」「年間利用額」で使う
+ * 「買い物1回ごとの合計金額の推移グラフ」「年間利用額」「店舗名の表示」で使う
  */
 export async function fetchAllCompletedTrips(): Promise<CompletedTripSummary[]> {
   const householdId = requireHouseholdId()
@@ -696,6 +718,7 @@ export async function fetchAllCompletedTrips(): Promise<CompletedTripSummary[]> 
       id: d.id,
       completedAt: (d.data().completedAt ?? '') as string,
       actualTotal: (d.data().actualTotal ?? 0) as number,
+      storeName: (d.data().storeName ?? null) as string | null,
     }))
     .sort((a, b) => (a.completedAt < b.completedAt ? -1 : 1))
 }

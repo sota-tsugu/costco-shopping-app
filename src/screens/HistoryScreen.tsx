@@ -34,6 +34,11 @@ import { ProductHistorySheet } from '../components/ProductHistorySheet'
 // タップするとProductHistorySheet(単価比較・購入履歴)が開く。以前は
 // 画面Aの買い物中リストからしか開けず、購入履歴を眺めながら価格を
 // 振り返りたい場面(まさにこの画面)に導線が無かったため追加した
+//
+// 【店舗名の表示】計画中に「行く予定日・店舗」を設定していた場合、
+// そのトリップの店舗名を購入日の一覧・日別詳細に添えて表示する
+// (storeNameByTripId)。1日に複数トリップがある場合は先頭の記録の
+// トリップの店舗名で代表させる簡易的な扱いにしている
 
 type Props = {
   onBack: () => void
@@ -139,6 +144,17 @@ export function HistoryScreen({ onBack }: Props) {
 
   const selectedGroup = groupedByDate.find((g) => g.date === selectedDate) ?? null
 
+  // トリップid→店舗名のマップ(計画中に設定していれば)。購入日一覧・
+  // 日別詳細に店舗名を添えるために使う。1日に複数トリップがある場合は
+  // 先頭の記録のトリップの店舗名で代表させる簡易的な扱いにしている
+  const storeNameByTripId = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const trip of trips ?? []) {
+      if (trip.storeName) map.set(trip.id, trip.storeName)
+    }
+    return map
+  }, [trips])
+
   return (
     <div className="min-h-screen bg-slate-50 pb-8">
       <header className="bg-costco-blue-700 px-4 pb-4 pt-4 text-white shadow-md">
@@ -162,6 +178,10 @@ export function HistoryScreen({ onBack }: Props) {
           <>
             <p className="mb-3 text-sm text-slate-500">
               {selectedGroup.entries.length}点 ・ 合計 ¥{selectedGroup.total.toLocaleString()}
+              {(() => {
+                const storeName = storeNameByTripId.get(selectedGroup.entries[0]?.tripId ?? '')
+                return storeName ? ` ・ ${storeName}` : ''
+              })()}
             </p>
             <ul className="space-y-1.5">
               {selectedGroup.entries.map((entry) => (
@@ -262,7 +282,13 @@ export function HistoryScreen({ onBack }: Props) {
                       >
                         <div className="min-w-0 flex-1">
                           <div className="text-sm text-slate-800">{dateLabel(date)}</div>
-                          <div className="text-xs text-slate-400">{entries.length}点</div>
+                          <div className="truncate text-xs text-slate-400">
+                            {entries.length}点
+                            {(() => {
+                              const storeName = storeNameByTripId.get(entries[0]?.tripId ?? '')
+                              return storeName ? ` ・ ${storeName}` : ''
+                            })()}
+                          </div>
                         </div>
                         <span className="shrink-0 text-sm font-semibold text-slate-800">
                           ¥{total.toLocaleString()}

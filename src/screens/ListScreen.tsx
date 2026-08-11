@@ -16,6 +16,7 @@ import {
   ListChecks,
   CornerUpLeft,
   TrendingUp,
+  Calendar,
 } from 'lucide-react'
 import {
   useTripStore,
@@ -30,7 +31,15 @@ import { ProductHistorySheet } from '../components/ProductHistorySheet'
 import { TripStageIndicator } from '../components/TripStageIndicator'
 import { ScreenPageDots } from '../components/ScreenPageDots'
 import { PRODUCT_CATALOG } from '../data/productCatalog'
+import { COSTCO_STORES, OTHER_STORE_VALUE } from '../data/costcoStores'
 import { toDigitsOnly, formatWithCommas } from '../utils/numberInput'
+
+// 予定日(YYYY-MM-DD)を「8月20日(木)」のような表示用の文字列に変換する
+function formatPlannedDate(dateStr: string): string {
+  const d = new Date(`${dateStr}T00:00:00`)
+  if (Number.isNaN(d.getTime())) return dateStr
+  return d.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', weekday: 'short' })
+}
 
 // 画面A:今回買うものリスト画面。
 // 買い物前の計画(定番商品リストから選ぶ・予算設定)から、店内での進行管理
@@ -58,6 +67,7 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
   const addProduct = useTripStore((state) => state.addProduct)
   const ensurePlanningTrip = useTripStore((state) => state.ensurePlanningTrip)
   const updateTripBudget = useTripStore((state) => state.updateTripBudget)
+  const updateTripPlan = useTripStore((state) => state.updateTripPlan)
   const togglePlannedProduct = useTripStore((state) => state.togglePlannedProduct)
   const startShopping = useTripStore((state) => state.startShopping)
   const backToPlanning = useTripStore((state) => state.backToPlanning)
@@ -75,6 +85,7 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
   const [lastTripCandidates, setLastTripCandidates] = useState<Product[] | null>(null)
   const [lastTripTotal, setLastTripTotal] = useState<number | null>(null)
   const [isPlanRecapOpen, setIsPlanRecapOpen] = useState(false)
+  const [isTripPlanOpen, setIsTripPlanOpen] = useState(false)
   const [historyProductName, setHistoryProductName] = useState<string | null>(null)
 
   // トリップが無ければ、初期予算3万円でplanningトリップを自動的に作る
@@ -337,6 +348,25 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
               <p className="mt-1 text-right text-xs text-costco-blue-100">
                 前回の購入額 ¥{lastTripTotal.toLocaleString()}
               </p>
+            )}
+            {currentTrip && (
+              <button
+                onClick={() => setIsTripPlanOpen(true)}
+                className="mt-2 flex w-full items-center justify-between rounded-lg bg-white/10 px-2.5 py-1.5 text-xs text-costco-blue-100 active:bg-white/20"
+              >
+                <span className="flex min-w-0 items-center gap-1.5 truncate">
+                  <Calendar className="h-3.5 w-3.5 shrink-0" />
+                  {currentTrip.plannedDate || currentTrip.storeName ? (
+                    <span className="truncate">
+                      {currentTrip.plannedDate ? formatPlannedDate(currentTrip.plannedDate) : '日程未定'}
+                      {currentTrip.storeName ? ` ・ ${currentTrip.storeName}` : ''}
+                    </span>
+                  ) : (
+                    '行く予定日・店舗を設定'
+                  )}
+                </span>
+                <Pencil className="h-3 w-3 shrink-0 text-costco-blue-200" />
+              </button>
             )}
           </div>
         )}
@@ -681,6 +711,17 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
 
       {isPlanRecapOpen && currentTrip && (
         <PlanRecapSheet budget={currentTrip.budget} items={plannedItems} onClose={() => setIsPlanRecapOpen(false)} />
+      )}
+
+      {isTripPlanOpen && currentTrip && (
+        <TripPlanSheet
+          plannedDate={currentTrip.plannedDate}
+          storeName={currentTrip.storeName}
+          onClose={() => setIsTripPlanOpen(false)}
+          onSave={(plannedDate, storeName) => {
+            void updateTripPlan(plannedDate, storeName)
+          }}
+        />
       )}
 
       {historyProductName && (
@@ -1130,6 +1171,91 @@ function PlanRecapSheet({ budget, items, onClose }: PlanRecapSheetProps) {
             ))}
           </ul>
         )}
+      </div>
+    </div>
+  )
+}
+
+type TripPlanSheetProps = {
+  plannedDate: string | null
+  storeName: string | null
+  onClose: () => void
+  onSave: (plannedDate: string | null, storeName: string | null) => void
+}
+
+/**
+ * 計画中の画面から開く、行く予定日・店舗を設定するシート。
+ * どちらも任意項目(未設定のままでも買い物を始められる)。
+ * 店舗は一覧から選ぶ形式だが、リストに無い店舗にも対応できるよう
+ * 「その他(自由入力)」を用意している(costcoStores.tsを参照。
+ * Web検索で確認できた店舗のみのリストのため、全店舗を網羅していない)
+ */
+function TripPlanSheet({ plannedDate, storeName, onClose, onSave }: TripPlanSheetProps) {
+  const isKnownStore = storeName !== null && COSTCO_STORES.includes(storeName)
+  const [date, setDate] = useState(plannedDate ?? '')
+  const [selectedStore, setSelectedStore] = useState(
+    storeName === null ? '' : isKnownStore ? storeName : OTHER_STORE_VALUE,
+  )
+  const [customStore, setCustomStore] = useState(isKnownStore || storeName === null ? '' : storeName)
+
+  function handleSave() {
+    const finalStore = selectedStore === OTHER_STORE_VALUE ? customStore.trim() || null : selectedStore || null
+    onSave(date || null, finalStore)
+    onClose()
+  }
+
+  return (
+    <div className="fixed inset-0 z-20 flex items-end justify-center bg-black/40 sm:items-center">
+      <div className="w-full max-w-sm rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-2xl">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-base font-bold text-slate-800">行く予定日・店舗</h2>
+          <button onClick={onClose} className="rounded-full p-1 text-slate-400 hover:bg-slate-100">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <label className="mb-3 block">
+          <span className="mb-1 block text-xs font-medium text-slate-500">予定日</span>
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-costco-blue-500 focus:outline-none"
+          />
+        </label>
+
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-slate-500">店舗</span>
+          <select
+            value={selectedStore}
+            onChange={(e) => setSelectedStore(e.target.value)}
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-costco-blue-500 focus:outline-none"
+          >
+            <option value="">選択しない</option>
+            {COSTCO_STORES.map((store) => (
+              <option key={store} value={store}>
+                {store}
+              </option>
+            ))}
+            <option value={OTHER_STORE_VALUE}>その他(自由入力)</option>
+          </select>
+        </label>
+        {selectedStore === OTHER_STORE_VALUE && (
+          <input
+            type="text"
+            value={customStore}
+            onChange={(e) => setCustomStore(e.target.value)}
+            placeholder="店舗名を入力"
+            className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-costco-blue-500 focus:outline-none"
+          />
+        )}
+
+        <button
+          onClick={handleSave}
+          className="mt-5 flex w-full items-center justify-center gap-1.5 rounded-xl bg-costco-blue-600 px-4 py-3 text-sm font-semibold text-white active:bg-costco-blue-700"
+        >
+          保存する
+        </button>
       </div>
     </div>
   )
