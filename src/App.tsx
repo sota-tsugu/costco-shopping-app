@@ -43,6 +43,12 @@ function App() {
   // 持たせているのは、カート画面が裏で計画中トリップに切り替わっても
   // レシートの表示自体には影響させないようにするため
   const [pendingReceipt, setPendingReceipt] = useState<ReceiptData | null>(null)
+  // 会計完了〜レシート表示までの間(カートが空になった画面をあえて
+  // 見せている待ち時間)も、カート画面に留まらせるためのフラグ。
+  // このタイミングではまだpendingReceiptがセットされていないため、
+  // pendingReceiptだけでは待ち時間中にリスト画面へ切り替わってしまう
+  // (「今回買うものリストが一瞬映ってしまう」不具合の原因だった)
+  const [isSettlingCheckout, setIsSettlingCheckout] = useState(false)
 
   const init = useTripStore((state) => state.init)
   const currentTrip = useTripStore((state) => state.currentTrip)
@@ -64,26 +70,28 @@ function App() {
   // 瞬間、その古いviewがそのまま表に出てきて、いきなりカート画面に
   // 飛んでしまう不具合があった(買い物中に一度でもカート画面を開いた
   // 後、計画中に戻って再度「買い物を始める」を押すと再現する)。
-  // ただし、レシート表示中はまだカート画面に留まらせたいため、
-  // pendingReceiptがある間はこのリセットを見送る。レシートを閉じて
-  // pendingReceiptがnullに戻ると、この同じeffectが再度発火して
-  // 正しく'list'にリセットされる(依存配列にpendingReceiptを含めているため)
+  // ただし、会計完了〜レシート表示中はまだカート画面に留まらせたいため、
+  // isSettlingCheckout・pendingReceiptがある間はこのリセットを見送る。
+  // レシートを閉じてどちらもfalse/nullに戻ると、この同じeffectが
+  // 再度発火して正しく'list'にリセットされる
   useEffect(() => {
-    if (!isActive && !pendingReceipt) {
+    if (!isActive && !isSettlingCheckout && !pendingReceipt) {
       setView('list')
     }
-  }, [isActive, pendingReceipt])
+  }, [isActive, isSettlingCheckout, pendingReceipt])
 
   // 買い物中(active)でなければ、カート画面を選んでいても常にリスト画面を表示する。
   // 画面C(購入履歴)は「買い物の前後に関わらずいつでも振り返れる」画面のため、
   // この制約の対象外にしている。
   //
   // 【レシート表示中は例外】会計完了直後はisActiveがすぐfalseになるが、
-  // レシート(pendingReceipt)を表示している間は、あえてカート画面(空に
-  // なった状態)に留まらせる。会計完了→即リスト画面、ではなく、
-  // 会計完了→カートが空になった画面を見せる→レシート表示、という
-  // 順番の方が「会計が終わった」という実感を持てるため
-  const effectiveView = view === 'history' ? 'history' : isActive || pendingReceipt ? view : 'list'
+  // 会計完了〜レシート表示の間(isSettlingCheckout)・レシート表示中
+  // (pendingReceipt)は、あえてカート画面(空になった状態)に留まらせる。
+  // 会計完了→即リスト画面、ではなく、会計完了→カートが空になった
+  // 画面を見せる→レシート表示、という順番の方が「会計が終わった」
+  // という実感を持てるため
+  const effectiveView =
+    view === 'history' ? 'history' : isActive || isSettlingCheckout || pendingReceipt ? view : 'list'
 
   function goTo(next: 'list' | 'cart' | 'history') {
     setView((prev) => {
@@ -142,7 +150,14 @@ function App() {
       <div onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
         <div key={transitionKey} className="screen-fade-in">
           {effectiveView === 'cart' ? (
-            <CartScreen onBack={() => goTo('list')} onCheckoutComplete={setPendingReceipt} />
+            <CartScreen
+              onBack={() => goTo('list')}
+              onCheckoutSettling={() => setIsSettlingCheckout(true)}
+              onCheckoutComplete={(data) => {
+                setIsSettlingCheckout(false)
+                setPendingReceipt(data)
+              }}
+            />
           ) : effectiveView === 'history' ? (
             <HistoryScreen onBack={() => goTo('list')} />
           ) : (

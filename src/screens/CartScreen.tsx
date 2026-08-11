@@ -40,11 +40,14 @@ import type { ReceiptData } from '../components/ReceiptScreen'
 type Props = {
   /** リスト画面(画面A)へ戻る時に呼ぶ */
   onBack: () => void
+  /** 会計処理が成功した直後(レシート表示より前)に呼ぶ。App.tsx側で
+   * 画面の自動遷移を一時的に止め、空になったカート画面を留まらせるために使う */
+  onCheckoutSettling: () => void
   /** 会計完了時に、擬似レシート画面(ReceiptScreen)へ渡すデータとともに呼ぶ */
   onCheckoutComplete: (data: ReceiptData) => void
 }
 
-export function CartScreen({ onBack, onCheckoutComplete }: Props) {
+export function CartScreen({ onBack, onCheckoutSettling, onCheckoutComplete }: Props) {
   const tripItems = useTripStore((state) => state.tripItems)
   const products = useTripStore((state) => state.products)
   const currentTrip = useTripStore((state) => state.currentTrip)
@@ -111,9 +114,14 @@ export function CartScreen({ onBack, onCheckoutComplete }: Props) {
         lastTripTotal,
       }
       await completeCheckout()
-      // 会計完了の直後、カートが空になった画面(¥0・0点)をはっきり
-      // 目にしてから、レシートをポップさせる。以前は0.5秒にしていたが
-      // 「一瞬すぎて確認できない」とのことだったため、1.5秒に伸ばした
+      // 会計完了の直後、まずApp.tsx側に「画面の自動遷移を止めて」と
+      // 伝える(onCheckoutSettling)。ここで止めておかないと、
+      // isActiveがfalseになった瞬間、レシートの準備が整うより先に
+      // 計画中の画面が一瞬映ってしまう
+      onCheckoutSettling()
+      // カートが空になった画面(¥0・0点)をはっきり目にしてから、
+      // レシートをポップさせる。以前は0.5秒にしていたが「一瞬すぎて
+      // 確認できない」とのことだったため、1.5秒に伸ばした
       await new Promise((resolve) => setTimeout(resolve, 1500))
       onCheckoutComplete(receiptData)
     } catch (error) {
