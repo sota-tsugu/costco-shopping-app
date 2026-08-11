@@ -286,8 +286,8 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
   return (
     <div className={`min-h-screen bg-slate-50 ${isPlanning && products.length > 0 ? 'pb-28' : 'pb-8'}`}>
       <header
-        className={`relative overflow-hidden px-4 pb-4 pt-4 text-white shadow-md transition-colors ${
-          isActive ? 'bg-costco-blue-900' : 'bg-costco-blue-700'
+        className={`relative overflow-hidden px-4 pt-4 text-white shadow-md transition-colors ${
+          isActive ? 'bg-costco-blue-900 pb-2' : 'bg-costco-blue-700 pb-4'
         }`}
       >
         {isActive && (
@@ -493,7 +493,10 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
       </header>
       {isActive && <TricolorAccent variant="subtle" />}
 
-      <main key={isActive ? 'active' : 'planning'} className="screen-fade-in mx-auto max-w-md px-4 py-4">
+      <main
+        key={isActive ? 'active' : 'planning'}
+        className={`screen-fade-in mx-auto max-w-md px-4 pb-4 ${isActive ? 'pt-2' : 'pt-4'}`}
+      >
         {isPlanning && products.length > 0 && (
           <button
             onClick={handleOpenApplyLastTrip}
