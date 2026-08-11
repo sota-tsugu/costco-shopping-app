@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, Search, X, ChevronRight } from 'lucide-react'
+import { ArrowLeft, Search, X, ChevronRight, Tag } from 'lucide-react'
 import {
   fetchAllPurchaseHistory,
   fetchAllCompletedTrips,
@@ -191,8 +191,16 @@ export function HistoryScreen({ onBack }: Props) {
                     className="flex w-full items-center gap-2 rounded-xl bg-white px-3 py-2.5 text-left shadow-sm active:bg-slate-50"
                   >
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm text-slate-800 underline decoration-slate-300 underline-offset-2">
-                        {entry.productName}
+                      <div className="flex items-center gap-1">
+                        <span className="truncate text-sm text-slate-800 underline decoration-slate-300 underline-offset-2">
+                          {entry.productName}
+                        </span>
+                        {entry.isOnSale && (
+                          <span className="flex shrink-0 items-center gap-0.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                            <Tag className="h-2.5 w-2.5" />
+                            特売
+                          </span>
+                        )}
                       </div>
                       {entry.category && <div className="truncate text-xs text-slate-400">{entry.category}</div>}
                     </div>

@@ -85,6 +85,9 @@ export type TripItem = {
   barcode: string | null
   createdAt: string
   addedToCartAt: string | null
+  /** 店頭での特売価格だったかどうか。単価比較(値上がり/値下がり)の際に、
+   * 特売と通常価格を単純比較して誤解を招かないよう注釈を出すために使う */
+  isOnSale: boolean
 }
 
 type TripStoreState = {
@@ -140,6 +143,15 @@ type TripStoreState = {
     barcode: string | null
   }) => Promise<void>
   updateCartItemQuantity: (tripItemId: string, quantity: number) => Promise<void>
+  /**
+   * カートに入っている商品(inCart)の価格・内容量・単位・特売フラグを、
+   * 店頭で確認した実際の内容に修正する。計画時点の基準価格と実際の
+   * 店頭価格がズレていた場合(値上がり・値下がり・特売など)に使う
+   */
+  updateCartItemDetails: (
+    tripItemId: string,
+    updates: { price: number; amount: number | null; unit: string | null; isOnSale: boolean },
+  ) => Promise<void>
   removeTripItem: (tripItemId: string) => Promise<void>
   /** 会計を完了する(inCartの商品をpurchasedにし、トリップをcompletedにする) */
   completeCheckout: () => Promise<void>
@@ -151,7 +163,7 @@ type TripStoreState = {
   updatePurchaseRecord: (
     tripId: string,
     tripItemId: string,
-    updates: { price: number; amount: number | null; unit: string | null; quantity: number },
+    updates: { price: number; amount: number | null; unit: string | null; quantity: number; isOnSale: boolean },
   ) => Promise<void>
   /** 購入済みの記録(1件)を削除する。削除後、トリップの実際の合計金額も再計算する */
   removePurchaseRecord: (tripId: string, tripItemId: string) => Promise<void>
@@ -274,6 +286,7 @@ export const useTripStore = create<TripStoreState>((set, get) => ({
                     barcode: (data.barcode ?? null) as string | null,
                     createdAt: (data.createdAt ?? '') as string,
                     addedToCartAt: (data.addedToCartAt ?? null) as string | null,
+                    isOnSale: (data.isOnSale ?? false) as boolean,
                   }
                 })
                 .sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1))
@@ -398,6 +411,7 @@ export const useTripStore = create<TripStoreState>((set, get) => ({
         source: 'planned',
         createdAt: now,
         addedToCartAt: null,
+        isOnSale: false,
       })
     } else {
       // considering(検討中)だけでなく、inCart(会計待ち。買い物中に戻ってから
@@ -445,6 +459,7 @@ export const useTripStore = create<TripStoreState>((set, get) => ({
       amount: product?.defaultAmount ?? null,
       unit: product?.defaultUnit ?? null,
       addedToCartAt: new Date().toISOString(),
+      isOnSale: false,
     })
   },
 
@@ -467,6 +482,7 @@ export const useTripStore = create<TripStoreState>((set, get) => ({
       barcode: details.barcode,
       createdAt: now,
       addedToCartAt: now,
+      isOnSale: false,
     })
   },
 
@@ -477,6 +493,16 @@ export const useTripStore = create<TripStoreState>((set, get) => ({
     }
     const householdId = requireHouseholdId()
     await updateDoc(doc(householdCollection(householdId, 'tripItems'), tripItemId), { quantity })
+  },
+
+  async updateCartItemDetails(tripItemId, updates) {
+    const householdId = requireHouseholdId()
+    await updateDoc(doc(householdCollection(householdId, 'tripItems'), tripItemId), {
+      price: updates.price,
+      amount: updates.amount,
+      unit: updates.unit,
+      isOnSale: updates.isOnSale,
+    })
   },
 
   async removeTripItem(tripItemId) {
@@ -516,6 +542,7 @@ export const useTripStore = create<TripStoreState>((set, get) => ({
         barcode: (data.barcode ?? null) as string | null,
         createdAt: (data.createdAt ?? '') as string,
         addedToCartAt: (data.addedToCartAt ?? null) as string | null,
+        isOnSale: (data.isOnSale ?? false) as boolean,
       }
     })
 
@@ -549,6 +576,7 @@ export const useTripStore = create<TripStoreState>((set, get) => ({
       amount: updates.amount,
       unit: updates.unit,
       quantity: updates.quantity,
+      isOnSale: updates.isOnSale,
     })
     await recalculateTripActualTotal(householdId, tripId)
   },
@@ -710,6 +738,8 @@ export type ProductPurchaseRecord = {
   quantity: number
   /** 購入日時(会計完了時にセットされるaddedToCartAtを使う) */
   purchasedAt: string
+  /** 店頭での特売価格だったかどうか */
+  isOnSale: boolean
 }
 
 /**
@@ -736,6 +766,7 @@ export async function fetchPurchaseHistoryByProductName(productName: string): Pr
       unit: (d.data().unit ?? null) as string | null,
       quantity: (d.data().quantity ?? 1) as number,
       purchasedAt: (d.data().addedToCartAt ?? d.data().createdAt ?? '') as string,
+      isOnSale: (d.data().isOnSale ?? false) as boolean,
     }))
     .sort((a, b) => (a.purchasedAt > b.purchasedAt ? -1 : 1))
 }
@@ -768,6 +799,7 @@ export async function fetchAllPurchaseHistory(): Promise<PurchaseHistoryEntry[]>
       unit: (d.data().unit ?? null) as string | null,
       quantity: (d.data().quantity ?? 1) as number,
       purchasedAt: (d.data().addedToCartAt ?? d.data().createdAt ?? '') as string,
+      isOnSale: (d.data().isOnSale ?? false) as boolean,
     }))
     .sort((a, b) => (a.purchasedAt > b.purchasedAt ? -1 : 1))
 }

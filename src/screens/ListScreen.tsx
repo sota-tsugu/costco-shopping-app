@@ -17,6 +17,7 @@ import {
   CornerUpLeft,
   TrendingUp,
   Calendar,
+  Tag,
 } from 'lucide-react'
 import {
   useTripStore,
@@ -74,6 +75,7 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
   const updateProduct = useTripStore((state) => state.updateProduct)
   const removeProduct = useTripStore((state) => state.removeProduct)
   const updateCartItemQuantity = useTripStore((state) => state.updateCartItemQuantity)
+  const updateCartItemDetails = useTripStore((state) => state.updateCartItemDetails)
   const removeTripItem = useTripStore((state) => state.removeTripItem)
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
@@ -89,6 +91,10 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
   // TripPlanSheetを開いた時、未入力の項目を赤く強調表示するために使う
   const [tripPlanValidationFailed, setTripPlanValidationFailed] = useState(false)
   const [historyProductName, setHistoryProductName] = useState<string | null>(null)
+  // 計画時の基準価格と、実際に店頭で見た価格が違っていた場合に、
+  // カートに入っている商品の価格・内容量・単位・特売かどうかを
+  // その場で修正できるようにするためのシート
+  const [editingCartItem, setEditingCartItem] = useState<TripItem | null>(null)
 
   // トリップが無ければ、初期予算3万円でplanningトリップを自動的に作る
   // (以前のアプリと同様、毎回同じようなものを買う前提で「まず一覧が
@@ -647,7 +653,7 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
                         {item.productName}
                       </button>
                       <span
-                        className={`mt-0.5 inline-block rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                        className={`mt-0.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${
                           item.status === 'considering'
                             ? 'bg-slate-100 text-slate-500'
                             : 'bg-costco-blue-50 text-costco-blue-700'
@@ -655,6 +661,12 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
                       >
                         {item.status === 'considering' ? '検討中' : '会計待ち'}
                       </span>
+                      {item.status === 'inCart' && item.isOnSale && (
+                        <span className="mt-0.5 ml-1 inline-flex items-center gap-0.5 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+                          <Tag className="h-2.5 w-2.5" />
+                          特売
+                        </span>
+                      )}
                     </div>
                     {item.status === 'considering' ? (
                       <>
@@ -695,6 +707,16 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
                         <span className="shrink-0 text-xs text-slate-400">
                           ¥{((item.price ?? 0) * item.quantity).toLocaleString()}
                         </span>
+                        {/* 計画時の基準価格と、実際に店頭で見た価格が違うことが
+                            あるため、カートに入っている商品はここで価格・内容量・
+                            単位・特売かどうかを修正できるようにしている */}
+                        <button
+                          onClick={() => setEditingCartItem(item)}
+                          className="shrink-0 p-1 text-slate-300 active:text-costco-blue-600"
+                          aria-label="価格・内容量を修正する"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
                         <button
                           onClick={() => removeTripItem(item.id)}
                           className="shrink-0 p-1 text-slate-300 active:text-red-500"
@@ -799,6 +821,29 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
 
       {historyProductName && (
         <ProductHistorySheet productName={historyProductName} onClose={() => setHistoryProductName(null)} />
+      )}
+
+      {editingCartItem && (
+        <EditCartItemSheet
+          item={editingCartItem}
+          product={products.find((p) => p.id === editingCartItem.productId) ?? null}
+          onClose={() => setEditingCartItem(null)}
+          onSave={async (updates) => {
+            await updateCartItemDetails(editingCartItem.id, updates)
+          }}
+          onUpdateDefaultPrice={async (price) => {
+            if (!editingCartItem.productId) return
+            const product = products.find((p) => p.id === editingCartItem.productId)
+            if (!product) return
+            await updateProduct(product.id, {
+              name: product.name,
+              category: product.category,
+              price,
+              amount: product.defaultAmount,
+              unit: product.defaultUnit,
+            })
+          }}
+        />
       )}
 
       {isSettingsOpen && <SettingsModal onClose={() => setIsSettingsOpen(false)} />}
@@ -1357,6 +1402,131 @@ function TripPlanSheet({ plannedDate, storeName, showMissingWarning, onClose, on
         <button
           onClick={handleSave}
           className="mt-5 flex w-full items-center justify-center gap-1.5 rounded-xl bg-costco-blue-600 px-4 py-3 text-sm font-semibold text-white active:bg-costco-blue-700"
+        >
+          保存する
+        </button>
+      </div>
+    </div>
+  )
+}
+
+type EditCartItemSheetProps = {
+  item: TripItem
+  /** 定番商品リスト側の登録(基準価格の更新確認に使う)。バーコードスキャン
+   * 由来などでproductIdが無い場合はnull */
+  product: Product | null
+  onClose: () => void
+  onSave: (updates: { price: number; amount: number | null; unit: string | null; isOnSale: boolean }) => Promise<void>
+  /** 基準価格を今回の価格に更新する(確認後にのみ呼ばれる) */
+  onUpdateDefaultPrice: (price: number) => Promise<void>
+}
+
+/**
+ * カートに入っている商品(inCart)の価格・内容量・単位・特売かどうかを、
+ * 店頭で確認した実際の内容に修正するシート。計画時点の基準価格(定番
+ * 商品リストの登録値)と、実際の店頭価格がズレていた場合に使う。
+ *
+ * 【基準価格への反映確認】保存する価格が、定番商品リストの基準価格と
+ * 大きく異なり、かつ「特売価格だった」にチェックが入っていない場合は、
+ * 「この価格を今後の基準価格として更新しますか?」と確認する。特売
+ * だと分かっている場合は、一時的な値下がりのはずなので確認しない
+ */
+function EditCartItemSheet({ item, product, onClose, onSave, onUpdateDefaultPrice }: EditCartItemSheetProps) {
+  const [price, setPrice] = useState(String(item.price ?? 0))
+  const [amount, setAmount] = useState(item.amount !== null ? String(item.amount) : '')
+  const [unit, setUnit] = useState(item.unit ?? '')
+  const [isOnSale, setIsOnSale] = useState(item.isOnSale)
+  const [isSaving, setIsSaving] = useState(false)
+
+  const canSave = Number(price) > 0
+
+  async function handleSave() {
+    if (!canSave) return
+    setIsSaving(true)
+    try {
+      const finalPrice = Number(price)
+      await onSave({
+        price: finalPrice,
+        amount: Number(amount) > 0 ? Number(amount) : null,
+        unit: unit.trim() !== '' ? unit.trim() : null,
+        isOnSale,
+      })
+
+      // 特売でなく、基準価格と大きく異なる場合だけ更新確認を出す
+      // (1円単位の誤差では聞かない。10円以上または5%以上の差を目安にしている)
+      if (!isOnSale && product?.defaultPrice != null) {
+        const diff = Math.abs(finalPrice - product.defaultPrice)
+        const diffPercent = product.defaultPrice > 0 ? diff / product.defaultPrice : 0
+        if (diff >= 10 && diffPercent >= 0.05) {
+          const confirmed = window.confirm(
+            `定番商品リストの基準価格(¥${product.defaultPrice.toLocaleString()})と異なります。\n\n` +
+              `¥${finalPrice.toLocaleString()}を今後の基準価格として更新しますか?`,
+          )
+          if (confirmed) {
+            await onUpdateDefaultPrice(finalPrice)
+          }
+        }
+      }
+      onClose()
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-20 flex items-end justify-center bg-black/40 sm:items-center">
+      <div className="w-full max-w-sm rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-2xl">
+        <div className="mb-1 flex items-center justify-between">
+          <h2 className="min-w-0 flex-1 truncate text-base font-bold text-slate-800">{item.productName}</h2>
+          <button onClick={onClose} className="shrink-0 rounded-full p-1 text-slate-400 hover:bg-slate-100">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <p className="mb-4 text-xs text-slate-400">
+          店頭で見た実際の価格・内容量に修正できます。計画時の基準価格とは別に、この商品(1回ぶん)だけが変わります。
+        </p>
+
+        <label className="mb-1 block text-xs font-medium text-slate-500">価格(円)</label>
+        <input
+          type="text"
+          inputMode="numeric"
+          value={formatWithCommas(price)}
+          onChange={(e) => setPrice(toDigitsOnly(e.target.value))}
+          className="mb-2 w-full rounded-lg border border-slate-300 px-3 py-3 text-base focus:border-costco-blue-500 focus:outline-none"
+        />
+        <label className="mb-4 flex items-center gap-2 text-sm text-slate-600">
+          <input
+            type="checkbox"
+            checked={isOnSale}
+            onChange={(e) => setIsOnSale(e.target.checked)}
+            className="h-4 w-4 rounded border-slate-300 text-costco-blue-600 focus:ring-costco-blue-500"
+          />
+          特売価格だった
+        </label>
+
+        <label className="mb-1 block text-xs font-medium text-slate-500">内容量(任意)</label>
+        <div className="mb-6 flex gap-2">
+          <input
+            type="number"
+            inputMode="decimal"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="例:900"
+            className="w-1/2 rounded-lg border border-slate-300 px-3 py-3 text-base focus:border-costco-blue-500 focus:outline-none"
+          />
+          <input
+            type="text"
+            value={unit}
+            onChange={(e) => setUnit(e.target.value)}
+            placeholder="g等"
+            className="w-1/2 rounded-lg border border-slate-300 px-3 py-3 text-base focus:border-costco-blue-500 focus:outline-none"
+          />
+        </div>
+
+        <button
+          onClick={handleSave}
+          disabled={!canSave || isSaving}
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-costco-blue-700 px-4 py-3 font-semibold text-white shadow transition-colors active:bg-costco-blue-800 disabled:opacity-50"
         >
           保存する
         </button>

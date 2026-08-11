@@ -123,6 +123,7 @@ export function CartScreen({
           amount: item.amount,
           unit: item.unit,
           quantity: item.quantity,
+          isOnSale: item.isOnSale,
         })),
         total,
         lastTripTotal,

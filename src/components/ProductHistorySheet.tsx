@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { X, TrendingUp, TrendingDown, Minus, Pencil, Trash2 } from 'lucide-react'
+import { X, TrendingUp, TrendingDown, Minus, Pencil, Trash2, Tag } from 'lucide-react'
 import { useTripStore, fetchPurchaseHistoryByProductName, type ProductPurchaseRecord } from '../store/tripStore'
 import { LineChart, formatYen, type LineChartPoint } from './LineChart'
 import { toDigitsOnly, formatWithCommas } from '../utils/numberInput'
@@ -73,6 +73,8 @@ export function ProductHistorySheet({ productName, onClose }: Props) {
     percent: number
     latestDate: string
     previousDate: string
+    /** どちらかが特売価格だった場合、単純比較が実態とズレる可能性があることを示す */
+    involvesSale: boolean
   } | null = null
   if (history && history.length >= 2) {
     const latestUnit = unitPrice(history[0])
@@ -86,6 +88,7 @@ export function ProductHistorySheet({ productName, onClose }: Props) {
         percent: (diff / previousUnit) * 100,
         latestDate: history[0].purchasedAt,
         previousDate: history[1].purchasedAt,
+        involvesSale: history[0].isOnSale || history[1].isOnSale,
       }
     }
   }
@@ -168,6 +171,12 @@ export function ProductHistorySheet({ productName, onClose }: Props) {
                       {formatDate(priceCompare.previousDate)}(¥{formatYen(priceCompare.previous)}) → {formatDate(priceCompare.latestDate)}
                       (¥{formatYen(priceCompare.latest)})
                     </p>
+                    {priceCompare.involvesSale && (
+                      <p className="mt-1 flex items-center gap-1 text-xs text-amber-600">
+                        <Tag className="h-3 w-3" />
+                        どちらかが特売価格のため、参考程度の比較です
+                      </p>
+                    )}
                   </>
                 )}
                 {avgUnitPrice !== null && (
@@ -196,7 +205,18 @@ export function ProductHistorySheet({ productName, onClose }: Props) {
                   key={record.id}
                   className="flex items-center justify-between gap-2 rounded-xl bg-slate-50 px-3 py-2 text-sm"
                 >
-                  <span className="shrink-0 text-slate-500">{formatDate(record.purchasedAt)}</span>
+                  <span className="flex shrink-0 items-center gap-1 text-slate-500">
+                    {formatDate(record.purchasedAt)}
+                    {record.isOnSale && (
+                      <span
+                        className="flex items-center gap-0.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700"
+                        title="特売価格"
+                      >
+                        <Tag className="h-2.5 w-2.5" />
+                        特売
+                      </span>
+                    )}
+                  </span>
                   <span className="min-w-0 flex-1 truncate text-right text-slate-700">
                     ¥{record.price.toLocaleString()}
                     {record.amount !== null && (
@@ -247,6 +267,7 @@ function EditPurchaseRecordSheet({ record, onClose, onSaved }: EditPurchaseRecor
   const [amount, setAmount] = useState(record.amount !== null ? String(record.amount) : '')
   const [unit, setUnit] = useState(record.unit ?? '')
   const [quantity, setQuantity] = useState(String(record.quantity))
+  const [isOnSale, setIsOnSale] = useState(record.isOnSale)
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
@@ -261,6 +282,7 @@ function EditPurchaseRecordSheet({ record, onClose, onSaved }: EditPurchaseRecor
         amount: Number(amount) > 0 ? Number(amount) : null,
         unit: unit.trim() !== '' ? unit.trim() : null,
         quantity: Number(quantity),
+        isOnSale,
       })
       await onSaved()
     } finally {
@@ -296,8 +318,17 @@ function EditPurchaseRecordSheet({ record, onClose, onSaved }: EditPurchaseRecor
           inputMode="numeric"
           value={formatWithCommas(price)}
           onChange={(e) => setPrice(toDigitsOnly(e.target.value))}
-          className="mb-4 w-full rounded-lg border border-slate-300 px-3 py-3 text-base focus:border-costco-blue-500 focus:outline-none"
+          className="mb-2 w-full rounded-lg border border-slate-300 px-3 py-3 text-base focus:border-costco-blue-500 focus:outline-none"
         />
+        <label className="mb-4 flex items-center gap-2 text-sm text-slate-600">
+          <input
+            type="checkbox"
+            checked={isOnSale}
+            onChange={(e) => setIsOnSale(e.target.checked)}
+            className="h-4 w-4 rounded border-slate-300 text-costco-blue-600 focus:ring-costco-blue-500"
+          />
+          特売価格だった
+        </label>
 
         <label className="mb-1 block text-xs font-medium text-slate-500">内容量(任意)</label>
         <div className="mb-4 flex gap-2">

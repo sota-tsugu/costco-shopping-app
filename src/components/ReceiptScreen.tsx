@@ -34,6 +34,7 @@ export type ReceiptItem = {
   amount: number | null
   unit: string | null
   quantity: number
+  isOnSale: boolean
 }
 
 export type ReceiptData = {
@@ -161,7 +162,10 @@ export function ReceiptScreen({ data, onClose }: Props) {
           {data.items.map((item, i) => (
             <li key={i}>
               <div className="flex justify-between">
-                <span className="min-w-0 flex-1 truncate pr-2">{item.name}</span>
+                <span className="min-w-0 flex-1 truncate pr-2">
+                  {item.name}
+                  {item.isOnSale && ' ※特売'}
+                </span>
                 <span className="shrink-0">¥{(item.price * item.quantity).toLocaleString()}</span>
               </div>
               <div className="flex justify-between text-[#888]">
@@ -328,12 +332,15 @@ function drawReceiptToCanvas(
   for (const item of data.items) {
     ctx.fillStyle = INK
     ctx.font = `${11 * SCALE}px 'Courier New', monospace`
-    let name = item.name
+    const fullName = item.isOnSale ? `${item.name} ※特売` : item.name
+    let name = fullName
     const maxNameWidth = WIDTH - PADDING * 2 - 70 * SCALE
+    let wasTruncated = false
     while (ctx.measureText(name).width > maxNameWidth && name.length > 1) {
       name = name.slice(0, -1)
+      wasTruncated = true
     }
-    if (name !== item.name) name += '…'
+    if (wasTruncated) name += '…'
     ctx.fillText(name, PADDING, y)
     ctx.textAlign = 'right'
     ctx.fillText(`¥${(item.price * item.quantity).toLocaleString()}`, WIDTH - PADDING, y)
