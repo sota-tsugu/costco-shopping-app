@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { X, RefreshCw, Loader2, Users, Copy, Check, LogOut, Trash2, Wrench, HelpCircle } from 'lucide-react'
+import { X, RefreshCw, Loader2, Users, Copy, Check, LogOut, Trash2, HelpCircle } from 'lucide-react'
 import { forceUpdateApp } from '../utils/appUpdate'
 import { forgetHousehold, getSavedHouseholdId } from '../firebase/household'
-import { useTripStore, resetStuckTrips } from '../store/tripStore'
+import { useTripStore } from '../store/tripStore'
 import { HelpModal } from './HelpModal'
 
 // アプリの設定画面(モーダル)。
@@ -22,7 +22,6 @@ export function SettingsModal({ onClose }: Props) {
   const [isUpdating, setIsUpdating] = useState(false)
   const [isCopied, setIsCopied] = useState(false)
   const [isClearingProducts, setIsClearingProducts] = useState(false)
-  const [isResettingTrip, setIsResettingTrip] = useState(false)
   const [isHelpOpen, setIsHelpOpen] = useState(false)
   const householdId = getSavedHouseholdId()
   const products = useTripStore((state) => state.products)
@@ -61,27 +60,6 @@ export function SettingsModal({ onClose }: Props) {
       await clearAllProducts()
     } finally {
       setIsClearingProducts(false)
-    }
-  }
-
-  // 一連の不具合調査の過程で、Firestore上に「進行中(planning/active)」
-  // のまま残ってしまった壊れたトリップをまとめてリセットする。
-  // 完了済みの購入履歴には触れないため、過去の記録は消えない
-  async function handleResetStuckTrip() {
-    const confirmed = window.confirm(
-      '今の「今回買うものリスト」の進行状態をリセットしますか?\n\n' +
-        '今チェックしている商品やカートの中身は失われます(定番商品リストや、これまでの購入履歴は消えません)。',
-    )
-    if (!confirmed) return
-    setIsResettingTrip(true)
-    try {
-      const count = await resetStuckTrips()
-      window.alert(count > 0 ? `${count}件のトリップをリセットしました。` : 'リセット対象のデータはありませんでした。')
-      window.location.reload()
-    } catch (error) {
-      window.alert(`リセットに失敗しました。\n(${error instanceof Error ? error.message : String(error)})`)
-    } finally {
-      setIsResettingTrip(false)
     }
   }
 
@@ -161,23 +139,6 @@ export function SettingsModal({ onClose }: Props) {
               <RefreshCw className="h-5 w-5" />
             )}
             {isUpdating ? '更新しています…' : 'アプリを最新の状態に更新する'}
-          </button>
-        </div>
-
-        <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
-          <p className="mb-3 text-sm text-slate-600">
-            「買い物中」の表示がおかしいまま元に戻らない場合(経過時間の数字がおかしい、など)は、こちらで今の進行状態をリセットできます。
-          </p>
-          <p className="mb-3 text-xs text-slate-400">
-            定番商品リスト・これまでの購入履歴には触れません。今チェックしている商品やカートの中身だけリセットされます。
-          </p>
-          <button
-            onClick={handleResetStuckTrip}
-            disabled={isResettingTrip}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-amber-300 px-4 py-2.5 text-sm font-medium text-amber-700 disabled:opacity-50"
-          >
-            <Wrench className="h-4 w-4" />
-            {isResettingTrip ? 'リセットしています…' : '今回買うものリストの進行状態をリセット'}
           </button>
         </div>
 
