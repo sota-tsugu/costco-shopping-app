@@ -302,18 +302,6 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
               スペースは購入履歴ラベルを横並びで見せる余裕にあてている */}
           <h1 className={isActive ? 'sr-only' : 'text-base font-semibold'}>今回買うものリスト</h1>
           <div className="flex items-center gap-1">
-            {/* 計画中は空っぽ(薄い色・バッジ無し)、買い物中は商品が入り
-                始めたことが分かるよう白色+件数バッジで表す。カートの
-                イラストそのものは画面Bの役割と重複するため、既存の
-                ShoppingCartアイコンの見た目だけを変える軽いタッチにしている */}
-            <div className="relative mr-1">
-              <ShoppingCart className={`h-5 w-5 ${isActive ? 'text-white' : 'text-costco-blue-300'}`} />
-              {isActive && cartCount > 0 && (
-                <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-costco-red-600 px-1 text-[10px] font-bold leading-none text-white">
-                  {cartCount}
-                </span>
-              )}
-            </div>
             <button
               onClick={onOpenHistory}
               className="flex flex-col items-center gap-0.5 rounded-lg px-1.5 py-0.5 text-costco-blue-100 transition-colors hover:bg-costco-blue-600"
@@ -416,7 +404,14 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
               }`}
             >
               <span className="flex items-center gap-1.5 text-sm">
-                <ShoppingCart className="h-4 w-4" />
+                <span className="relative shrink-0">
+                  <ShoppingCart className="h-4 w-4" />
+                  {cartCount > 0 && (
+                    <span className="absolute -right-1.5 -top-1.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-costco-red-600 px-1 text-[9px] font-bold leading-none text-white">
+                      {cartCount}
+                    </span>
+                  )}
+                </span>
                 カート {cartCount}点
               </span>
               <span className="flex items-center gap-1.5 text-base font-semibold">
