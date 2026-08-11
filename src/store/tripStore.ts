@@ -120,6 +120,13 @@ type TripStoreState = {
   updateTripBudget: (budget: number) => Promise<void>
   /** 行く予定の日・店舗を設定する(どちらもnullで未設定に戻せる) */
   updateTripPlan: (plannedDate: string | null, storeName: string | null) => Promise<void>
+  /**
+   * 計画(planning中のトリップ)をまるごと白紙に戻す。買い物予定が
+   * 急遽取りやめになった場合などに使う。選んでいた商品(定番棚からの
+   * チェック分・スキャンで追加した分)をすべて削除し、予算・行く予定日・
+   * 店舗も未設定の状態に戻す
+   */
+  resetTripPlan: () => Promise<void>
   /** 定番商品を今回買うものリストに入れる/外す(planning中のみ) */
   togglePlannedProduct: (product: Product, selected: boolean) => Promise<void>
   /** 買い物を開始する(planning→active) */
@@ -386,6 +393,25 @@ export const useTripStore = create<TripStoreState>((set, get) => ({
       plannedDate,
       storeName,
     })
+  },
+
+  async resetTripPlan() {
+    const { currentTrip, tripItems } = get()
+    if (!currentTrip) return
+    const householdId = requireHouseholdId()
+    // tripItemsはこの時点でcurrentTrip宛てのものだけが購読されているため、
+    // 絞り込まずそのまま全件を対象にしてよい(購入済み=purchasedの記録は
+    // 会計完了済みの別トリップに属するため、そもそもここには含まれない)
+    const batch = writeBatch(db)
+    for (const item of tripItems) {
+      batch.delete(doc(householdCollection(householdId, 'tripItems'), item.id))
+    }
+    batch.update(doc(householdCollection(householdId, 'shoppingTrips'), currentTrip.id), {
+      budget: 0,
+      plannedDate: null,
+      storeName: null,
+    })
+    await batch.commit()
   },
 
   async togglePlannedProduct(product, selected) {

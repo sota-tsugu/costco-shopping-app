@@ -68,6 +68,7 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
   const ensurePlanningTrip = useTripStore((state) => state.ensurePlanningTrip)
   const updateTripBudget = useTripStore((state) => state.updateTripBudget)
   const updateTripPlan = useTripStore((state) => state.updateTripPlan)
+  const resetTripPlan = useTripStore((state) => state.resetTripPlan)
   const togglePlannedProduct = useTripStore((state) => state.togglePlannedProduct)
   const startShopping = useTripStore((state) => state.startShopping)
   const backToPlanning = useTripStore((state) => state.backToPlanning)
@@ -102,7 +103,9 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
     if (currentTrip === null) {
       void ensurePlanningTrip(Number(budgetInput) || 30000)
     } else {
-      setBudgetInput(String(currentTrip.budget))
+      // 「計画を白紙に戻す」で予算を0にした直後は、入力欄に「0」ではなく
+      // 空欄を出す(未入力であることが直感的に伝わるようにするため)
+      setBudgetInput(currentTrip.budget > 0 ? String(currentTrip.budget) : '')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentTrip])
@@ -184,6 +187,11 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
       .reduce((sum, item) => sum + (item.price ?? 0) * item.quantity, 0)
   }, [tripItems])
 
+  // 「計画を白紙に戻す」ボタンを出すかどうか。何も選んでおらず、予算・
+  // 行く予定日・店舗のいずれも未設定であれば、リセットする対象が無いため出さない
+  const hasPlanToReset =
+    tripItems.length > 0 || (currentTrip?.budget ?? 0) > 0 || !!currentTrip?.plannedDate || !!currentTrip?.storeName
+
   // 予算オーバーの判定。計画中は入力中の予算(budgetInput)、買い物中は
   // 確定している予算(currentTrip.budget)と比べる
   const budgetForPlanning = Number(budgetInput)
@@ -256,6 +264,17 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
     )
     if (!confirmed) return
     await backToPlanning()
+  }
+
+  // 「計画を白紙に戻す」:買い物予定が急遽取りやめになった場合などに、
+  // 選んでいた商品・予算・行く予定日/店舗をまとめてリセットする。
+  // 選択作業がまとめて消える操作のため、確認ダイアログを必ず挟む
+  async function handleResetTripPlan() {
+    const confirmed = window.confirm(
+      '計画を白紙に戻しますか?選んでいる商品・予算・行く予定日/店舗が、すべて未設定に戻ります。',
+    )
+    if (!confirmed) return
+    await resetTripPlan()
   }
 
   // 「前回買ったものを反映」:直近に完了した買い物トリップで実際に
@@ -395,6 +414,14 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
                   </button>
                 )
               })()}
+            {hasPlanToReset && (
+              <button
+                onClick={handleResetTripPlan}
+                className="mt-2 w-full text-center text-[11px] text-costco-blue-200 underline underline-offset-2 active:text-white"
+              >
+                計画を白紙に戻す
+              </button>
+            )}
           </div>
         )}
 
