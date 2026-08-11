@@ -153,6 +153,7 @@ function App() {
             <CartScreen
               onBack={() => goTo('list')}
               onCheckoutSettling={() => setIsSettlingCheckout(true)}
+              onCheckoutSettlingCanceled={() => setIsSettlingCheckout(false)}
               onCheckoutComplete={(data) => {
                 setIsSettlingCheckout(false)
                 setPendingReceipt(data)

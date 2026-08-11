@@ -40,14 +40,21 @@ import type { ReceiptData } from '../components/ReceiptScreen'
 type Props = {
   /** リスト画面(画面A)へ戻る時に呼ぶ */
   onBack: () => void
-  /** 会計処理が成功した直後(レシート表示より前)に呼ぶ。App.tsx側で
-   * 画面の自動遷移を一時的に止め、空になったカート画面を留まらせるために使う */
+  /** 会計処理を始める直前に呼ぶ。App.tsx側で画面の自動遷移を一時的に
+   * 止め、空になったカート画面を留まらせるために使う */
   onCheckoutSettling: () => void
+  /** 会計処理が失敗した時に呼ぶ。onCheckoutSettlingで止めた画面遷移を解除する */
+  onCheckoutSettlingCanceled: () => void
   /** 会計完了時に、擬似レシート画面(ReceiptScreen)へ渡すデータとともに呼ぶ */
   onCheckoutComplete: (data: ReceiptData) => void
 }
 
-export function CartScreen({ onBack, onCheckoutSettling, onCheckoutComplete }: Props) {
+export function CartScreen({
+  onBack,
+  onCheckoutSettling,
+  onCheckoutSettlingCanceled,
+  onCheckoutComplete,
+}: Props) {
   const tripItems = useTripStore((state) => state.tripItems)
   const products = useTripStore((state) => state.products)
   const currentTrip = useTripStore((state) => state.currentTrip)
@@ -94,6 +101,14 @@ export function CartScreen({ onBack, onCheckoutSettling, onCheckoutComplete }: P
 
   async function runCheckout() {
     setIsCheckingOut(true)
+    // 【呼ぶ順番が重要】completeCheckout()を呼ぶ「前」に、必ず先に
+    // onCheckoutSettling()でApp.tsx側の画面遷移を止めておく。
+    // 以前はcompleteCheckout()の後に呼んでいたが、Firestoreへの書き込みは
+    // ローカルに即座に反映される(サーバーの応答を待たない)仕組みのため、
+    // completeCheckout()のawaitが返ってくるより先に、リアルタイム購読側が
+    // 反応してisActiveがfalseになり、計画中の画面へ切り替わってしまう
+    // (画面の遷移を止める合図が間に合わない)ケースがあった
+    onCheckoutSettling()
     try {
       // 会計完了後はtripStore側の状態(currentTrip・tripItems)がすぐに
       // 次の計画中トリップへ切り替わってしまうため、擬似レシートに使う
@@ -114,11 +129,6 @@ export function CartScreen({ onBack, onCheckoutSettling, onCheckoutComplete }: P
         lastTripTotal,
       }
       await completeCheckout()
-      // 会計完了の直後、まずApp.tsx側に「画面の自動遷移を止めて」と
-      // 伝える(onCheckoutSettling)。ここで止めておかないと、
-      // isActiveがfalseになった瞬間、レシートの準備が整うより先に
-      // 計画中の画面が一瞬映ってしまう
-      onCheckoutSettling()
       // カートが空になった画面(¥0・0点)をはっきり目にしてから、
       // レシートをポップさせる。以前は0.5秒にしていたが「一瞬すぎて
       // 確認できない」とのことだったため、1.5秒に伸ばした
@@ -127,7 +137,9 @@ export function CartScreen({ onBack, onCheckoutSettling, onCheckoutComplete }: P
     } catch (error) {
       // 会計の完了に失敗した場合、これまでは何も表示されず「買い物中」の
       // 表示が残り続けたまま気づけなかったため、エラーを明示的に伝える
-      // ようにした(電波が悪い場所で通信が失敗した場合など)
+      // ようにした(電波が悪い場所で通信が失敗した場合など)。
+      // 失敗した場合は、先に止めておいた画面遷移も解除する必要がある
+      onCheckoutSettlingCanceled()
       window.alert(
         `買い物の終了に失敗しました。電波の良い場所で、もう一度「購入する」をお試しください。\n(${
           error instanceof Error ? error.message : String(error)
