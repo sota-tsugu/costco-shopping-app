@@ -244,10 +244,18 @@ export const useTripStore = create<TripStoreState>((set, get) => ({
           const trip = trips[0]
           set({ currentTrip: trip })
 
-          // このトリップに属する商品(tripItems)もリアルタイム購読する
+          // このトリップに属する商品(tripItems)もリアルタイム購読する。
+          // 購読の解除(unsubscribeTripItems)はトリップが切り替わる瞬間に
+          // 呼んでいるが、直前に発火が予約されていた古い通知が解除の
+          // タイミングと競合して後から届いてしまう可能性はゼロにはできない。
+          // その防御として、通知が届いた時点で「今のcurrentTripが本当に
+          // このtripId宛てか」を必ず確認し、既に別のトリップに切り替わって
+          // いれば無視する(会計完了後も計画中リストにチェックが残って
+          // しまう不具合の再発防止のため)
           unsubscribeTripItems = onSnapshot(
             query(householdCollection(householdId, 'tripItems'), where('tripId', '==', trip.id)),
             (itemsSnapshot) => {
+              if (get().currentTrip?.id !== trip.id) return
               const tripItems: TripItem[] = itemsSnapshot.docs
                 .map((d) => {
                   const data = d.data()
