@@ -185,6 +185,10 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
   const budgetForPlanning = Number(budgetInput)
   const isOverBudgetPlanning = budgetForPlanning > 0 && estimatedTotal > budgetForPlanning
   const isOverBudgetActive = currentTrip !== null && cartTotal > currentTrip.budget
+  // 買い物中の進捗バーに使う、予算に対する使用割合(%)。90%を超えたら
+  // 注意色(amber)、100%を超えたらオーバー色(red)に切り替える
+  const budgetUsagePercent =
+    currentTrip && currentTrip.budget > 0 ? Math.round((cartTotal / currentTrip.budget) * 100) : null
   // 画面B(カート)の点数表示と揃えるため、行数ではなく数量の合計を数える
   // (以前は行数のみを数えていたため、同じ商品の数量を増やしても点数が
   // 変わらない不具合があった)
@@ -416,20 +420,34 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
               </span>
               <span className="flex items-center gap-1.5 text-base font-semibold">
                 ¥{cartTotal.toLocaleString()}
-                {currentTrip && (
-                  <span className="text-xs font-normal text-costco-blue-100">
-                    / 予算¥{currentTrip.budget.toLocaleString()}
-                  </span>
-                )}
                 <ChevronRight className="h-4 w-4" />
               </span>
             </button>
-            {currentTrip && currentTrip.budget > 0 && (
-              <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/15">
-                <div
-                  className={`h-full rounded-full transition-all ${isOverBudgetActive ? 'bg-costco-red-300' : 'bg-white'}`}
-                  style={{ width: `${Math.min((cartTotal / currentTrip.budget) * 100, 100)}%` }}
-                />
+            {budgetUsagePercent !== null && (
+              <div className="mt-1.5 flex items-center gap-2">
+                <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/15">
+                  <div
+                    className={`h-full rounded-full transition-all ${
+                      budgetUsagePercent > 100
+                        ? 'bg-costco-red-300'
+                        : budgetUsagePercent >= 90
+                          ? 'bg-amber-300'
+                          : 'bg-white'
+                    }`}
+                    style={{ width: `${Math.min(budgetUsagePercent, 100)}%` }}
+                  />
+                </div>
+                <span
+                  className={`shrink-0 text-[11px] font-medium tabular-nums ${
+                    budgetUsagePercent > 100
+                      ? 'text-costco-red-200'
+                      : budgetUsagePercent >= 90
+                        ? 'text-amber-200'
+                        : 'text-costco-blue-100'
+                  }`}
+                >
+                  {budgetUsagePercent}%
+                </span>
               </div>
             )}
             {isOverBudgetActive && currentTrip && (
