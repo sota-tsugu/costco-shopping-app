@@ -124,6 +124,7 @@ export function CartScreen({
           unit: item.unit,
           quantity: item.quantity,
           isOnSale: item.isOnSale,
+          regularPrice: item.regularPrice,
         })),
         total,
         lastTripTotal,

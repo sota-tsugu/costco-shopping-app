@@ -13,7 +13,6 @@ import {
   History,
   ReceiptJapaneseYen,
   AlertTriangle,
-  ListChecks,
   CornerUpLeft,
   TrendingUp,
   Calendar,
@@ -33,6 +32,7 @@ import { TripStageIndicator } from '../components/TripStageIndicator'
 import { PRODUCT_CATALOG } from '../data/productCatalog'
 import { COSTCO_STORES, OTHER_STORE_VALUE } from '../data/costcoStores'
 import { toDigitsOnly, formatWithCommas } from '../utils/numberInput'
+import { calcDiscountPercent, formatDiscountPercent } from '../utils/discount'
 
 // 予定日(YYYY-MM-DD)を「8月20日(木)」のような表示用の文字列に変換する
 function formatPlannedDate(dateStr: string): string {
@@ -85,14 +85,13 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
   const [isApplyingLastTrip, setIsApplyingLastTrip] = useState(false)
   const [lastTripCandidates, setLastTripCandidates] = useState<Product[] | null>(null)
   const [lastTripTotal, setLastTripTotal] = useState<number | null>(null)
-  const [isPlanRecapOpen, setIsPlanRecapOpen] = useState(false)
   const [isTripPlanOpen, setIsTripPlanOpen] = useState(false)
   // 「買い物を始める」が行く予定日・店舗の未入力で止められた時にtrueにする。
   // TripPlanSheetを開いた時、未入力の項目を赤く強調表示するために使う
   const [tripPlanValidationFailed, setTripPlanValidationFailed] = useState(false)
   const [historyProductName, setHistoryProductName] = useState<string | null>(null)
   // 計画時の基準価格と、実際に店頭で見た価格が違っていた場合に、
-  // カートに入っている商品の価格・内容量・単位・特売かどうかを
+  // カートに入っている商品の価格・内容量・単位・セールかどうかを
   // その場で修正できるようにするためのシート
   const [editingCartItem, setEditingCartItem] = useState<TripItem | null>(null)
 
@@ -226,11 +225,6 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
     if (groups.has(OTHER_CATEGORY)) names.push(OTHER_CATEGORY)
     return names.map((category) => ({ category, items: groups.get(category)! }))
   }, [tripItems])
-
-  // 「計画を見る」シートに表示する、計画由来(source: 'planned')の商品一覧。
-  // 買い物中に削除した商品はtripItem自体が消えるため、この一覧には
-  // 出てこなくなる(計画時点の完全な記録ではなく、簡易的な参考表示)
-  const plannedItems = useMemo(() => tripItems.filter((item) => item.source === 'planned'), [tripItems])
 
   // 「買い物を始める」は、これまで確認なしで即座に実行していたため、
   // ゴーストクリック(スマホブラウザで、ボタンが入れ替わる瞬間にタップが
@@ -443,7 +437,7 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
                 ¥{cartTotal.toLocaleString()}
               </span>
             </button>
-            {budgetUsagePercent !== null && (
+            {budgetUsagePercent !== null && currentTrip && (
               <div className="mt-1.5 flex items-center gap-2">
                 <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/15">
                   <div
@@ -457,6 +451,9 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
                     style={{ width: `${Math.min(budgetUsagePercent, 100)}%` }}
                   />
                 </div>
+                {/* 「計画を見る」ボタンを廃止した際、そこにしか表示されて
+                    いなかった予算の金額が見えなくなってしまうため、
+                    ここに小さく添えている */}
                 <span
                   className={`shrink-0 text-[11px] font-medium tabular-nums ${
                     budgetUsagePercent > 100
@@ -466,7 +463,7 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
                         : 'text-costco-blue-100'
                   }`}
                 >
-                  {budgetUsagePercent}%
+                  予算¥{currentTrip.budget.toLocaleString()}中{budgetUsagePercent}%
                 </span>
               </div>
             )}
@@ -476,27 +473,16 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
                 予算を¥{(cartTotal - currentTrip.budget).toLocaleString()}オーバーしています
               </p>
             )}
-            {/* 「計画を見る」「計画中の画面に戻る」は、上のカートボタンとは
-                役割の重みが違う補助的な操作のため、間隔を空けて視覚的にも
-                グループを分けている。以前は文字だけのリンクと縁取りピルという
-                異なる見た目の組み合わせで重みがちぐはぐだったため、2列の
-                同じ大きさのボタンに揃え、タップ領域も広げた */}
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <button
-                onClick={() => setIsPlanRecapOpen(true)}
-                className="flex items-center justify-center gap-1.5 rounded-lg border border-white/30 bg-white/5 py-2 text-xs text-costco-blue-100 active:bg-white/15"
-              >
-                <ListChecks className="h-3.5 w-3.5" />
-                計画を見る
-              </button>
-              <button
-                onClick={handleBackToPlanning}
-                className="flex items-center justify-center gap-1.5 rounded-lg border border-white/30 bg-white/5 py-2 text-xs text-costco-blue-100 active:bg-white/15"
-              >
-                <CornerUpLeft className="h-3.5 w-3.5" />
-                計画中に戻る
-              </button>
-            </div>
+            {/* 「計画を見る」は、内容のほとんどがこの下に表示されている
+                買い物中の商品一覧・上の予算表示と重複していたため廃止した。
+                「計画中に戻る」は状態そのものを切り替える操作のため残している */}
+            <button
+              onClick={handleBackToPlanning}
+              className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-white/30 bg-white/5 py-2 text-xs text-costco-blue-100 active:bg-white/15"
+            >
+              <CornerUpLeft className="h-3.5 w-3.5" />
+              計画中に戻る
+            </button>
           </div>
         )}
       </header>
@@ -664,7 +650,12 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
                       {item.status === 'inCart' && item.isOnSale && (
                         <span className="mt-0.5 ml-1 inline-flex items-center gap-0.5 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">
                           <Tag className="h-2.5 w-2.5" />
-                          特売
+                          セール
+                          {item.regularPrice !== null &&
+                            item.price !== null &&
+                            calcDiscountPercent(item.regularPrice, item.price) !== null && (
+                              <> {formatDiscountPercent(item.regularPrice, item.price)}</>
+                            )}
                         </span>
                       )}
                     </div>
@@ -709,7 +700,7 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
                         </span>
                         {/* 計画時の基準価格と、実際に店頭で見た価格が違うことが
                             あるため、カートに入っている商品はここで価格・内容量・
-                            単位・特売かどうかを修正できるようにしている */}
+                            単位・セールかどうかを修正できるようにしている */}
                         <button
                           onClick={() => setEditingCartItem(item)}
                           className="shrink-0 p-1 text-slate-300 active:text-costco-blue-600"
@@ -798,10 +789,6 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
             setLastTripCandidates(null)
           }}
         />
-      )}
-
-      {isPlanRecapOpen && currentTrip && (
-        <PlanRecapSheet budget={currentTrip.budget} items={plannedItems} onClose={() => setIsPlanRecapOpen(false)} />
       )}
 
       {isTripPlanOpen && currentTrip && (
@@ -1246,54 +1233,6 @@ function ApplyLastTripSheet({ candidates, onClose, onSubmit }: ApplyLastTripShee
   )
 }
 
-type PlanRecapSheetProps = {
-  budget: number
-  /** 計画由来(source: 'planned')のtripItem。買い物中に削除した商品は
-   * データごと消えているため出てこない(簡易的な参考表示) */
-  items: TripItem[]
-  onClose: () => void
-}
-
-/** 買い物中に、計画時点の内容(予算・選んでいた商品)を振り返るための
- * 読み取り専用シート。買い物中の画面のヘッダーにある「計画を見る」から開く。
- * リストを常時長くしないよう、必要な時だけタップして確認する形にしている */
-function PlanRecapSheet({ budget, items, onClose }: PlanRecapSheetProps) {
-  return (
-    <div className="fixed inset-0 z-20 flex items-end justify-center bg-black/40 sm:items-center">
-      <div className="flex max-h-[80vh] w-full max-w-sm flex-col rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-2xl">
-        <div className="mb-1 flex items-center justify-between">
-          <h2 className="text-base font-bold text-slate-800">計画を見る</h2>
-          <button onClick={onClose} className="rounded-full p-1 text-slate-400 hover:bg-slate-100">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-        <p className="mb-3 text-xs text-slate-400">買い物前に決めた予算と、選んでいた商品です。</p>
-
-        <div className="mb-4 rounded-xl bg-slate-50 px-3 py-2.5">
-          <span className="text-xs text-slate-500">予算</span>
-          <div className="text-xl font-semibold text-slate-800">¥{budget.toLocaleString()}</div>
-        </div>
-
-        {items.length === 0 ? (
-          <p className="mb-2 text-sm text-slate-400">計画時に選んでいた商品はありません。</p>
-        ) : (
-          <ul className="mb-2 flex-1 space-y-1.5 overflow-y-auto">
-            {items.map((item) => (
-              <li
-                key={item.id}
-                className="flex items-center justify-between gap-2 rounded-xl bg-slate-50 px-3 py-2 text-sm"
-              >
-                <span className="min-w-0 flex-1 truncate text-slate-700">{item.productName}</span>
-                <span className="shrink-0 text-xs text-slate-400">数量 {item.quantity}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </div>
-  )
-}
-
 type TripPlanSheetProps = {
   plannedDate: string | null
   storeName: string | null
@@ -1434,29 +1373,44 @@ type EditCartItemSheetProps = {
    * 由来などでproductIdが無い場合はnull */
   product: Product | null
   onClose: () => void
-  onSave: (updates: { price: number; amount: number | null; unit: string | null; isOnSale: boolean }) => Promise<void>
+  onSave: (updates: {
+    price: number
+    amount: number | null
+    unit: string | null
+    isOnSale: boolean
+    regularPrice: number | null
+  }) => Promise<void>
   /** 基準価格を今回の価格に更新する(確認後にのみ呼ばれる) */
   onUpdateDefaultPrice: (price: number) => Promise<void>
 }
 
 /**
- * カートに入っている商品(inCart)の価格・内容量・単位・特売かどうかを、
+ * カートに入っている商品(inCart)の価格・内容量・単位・セールかどうかを、
  * 店頭で確認した実際の内容に修正するシート。計画時点の基準価格(定番
  * 商品リストの登録値)と、実際の店頭価格がズレていた場合に使う。
  *
  * 【基準価格への反映確認】保存する価格が、定番商品リストの基準価格と
- * 大きく異なり、かつ「特売価格だった」にチェックが入っていない場合は、
- * 「この価格を今後の基準価格として更新しますか?」と確認する。特売
+ * 大きく異なり、かつ「セール価格だった」にチェックが入っていない場合は、
+ * 「この価格を今後の基準価格として更新しますか?」と確認する。セール
  * だと分かっている場合は、一時的な値下がりのはずなので確認しない
+ *
+ * 【割引率】セールにチェックを入れると、通常価格(任意)の入力欄が出る。
+ * 入力すると、その場で割引率を計算して表示する(保存もされ、カートの
+ * 一覧やレシートのセールバッジにも割引率が添えられる)
  */
 function EditCartItemSheet({ item, product, onClose, onSave, onUpdateDefaultPrice }: EditCartItemSheetProps) {
   const [price, setPrice] = useState(String(item.price ?? 0))
   const [amount, setAmount] = useState(item.amount !== null ? String(item.amount) : '')
   const [unit, setUnit] = useState(item.unit ?? '')
   const [isOnSale, setIsOnSale] = useState(item.isOnSale)
+  const [regularPrice, setRegularPrice] = useState(item.regularPrice !== null ? String(item.regularPrice) : '')
   const [isSaving, setIsSaving] = useState(false)
 
   const canSave = Number(price) > 0
+  const discountPercent =
+    isOnSale && Number(regularPrice) > 0 && Number(price) > 0
+      ? calcDiscountPercent(Number(regularPrice), Number(price))
+      : null
 
   async function handleSave() {
     if (!canSave) return
@@ -1468,9 +1422,10 @@ function EditCartItemSheet({ item, product, onClose, onSave, onUpdateDefaultPric
         amount: Number(amount) > 0 ? Number(amount) : null,
         unit: unit.trim() !== '' ? unit.trim() : null,
         isOnSale,
+        regularPrice: isOnSale && Number(regularPrice) > 0 ? Number(regularPrice) : null,
       })
 
-      // 特売でなく、基準価格と大きく異なる場合だけ更新確認を出す
+      // セールでなく、基準価格と大きく異なる場合だけ更新確認を出す
       // (1円単位の誤差では聞かない。10円以上または5%以上の差を目安にしている)
       if (!isOnSale && product?.defaultPrice != null) {
         const diff = Math.abs(finalPrice - product.defaultPrice)
@@ -1512,15 +1467,34 @@ function EditCartItemSheet({ item, product, onClose, onSave, onUpdateDefaultPric
           onChange={(e) => setPrice(toDigitsOnly(e.target.value))}
           className="mb-2 w-full rounded-lg border border-slate-300 px-3 py-3 text-base focus:border-costco-blue-500 focus:outline-none"
         />
-        <label className="mb-4 flex items-center gap-2 text-sm text-slate-600">
+        <label className="mb-2 flex items-center gap-2 text-sm text-slate-600">
           <input
             type="checkbox"
             checked={isOnSale}
             onChange={(e) => setIsOnSale(e.target.checked)}
             className="h-4 w-4 rounded border-slate-300 text-costco-blue-600 focus:ring-costco-blue-500"
           />
-          特売価格だった
+          セール価格だった
         </label>
+
+        {isOnSale && (
+          <div className="mb-4 rounded-lg bg-amber-50 p-3">
+            <label className="mb-1 block text-xs font-medium text-amber-700">通常価格(任意・割引率の計算に使います)</label>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={formatWithCommas(regularPrice)}
+              onChange={(e) => setRegularPrice(toDigitsOnly(e.target.value))}
+              placeholder="例:1,280"
+              className="w-full rounded-lg border border-amber-200 bg-white px-3 py-2.5 text-base focus:border-amber-400 focus:outline-none"
+            />
+            {discountPercent !== null && (
+              <p className="mt-1.5 text-xs font-medium text-amber-700">
+                通常価格より{discountPercent}%オフです
+              </p>
+            )}
+          </div>
+        )}
 
         <label className="mb-1 block text-xs font-medium text-slate-500">内容量(任意)</label>
         <div className="mb-6 flex gap-2">

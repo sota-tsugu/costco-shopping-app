@@ -1,5 +1,6 @@
 import { useRef } from 'react'
 import { X, Share2 } from 'lucide-react'
+import { calcDiscountPercent, formatDiscountPercent } from '../utils/discount'
 
 // 会計完了時に表示する、擬似レシート画面。
 //
@@ -35,6 +36,8 @@ export type ReceiptItem = {
   unit: string | null
   quantity: number
   isOnSale: boolean
+  /** セールだった場合の通常価格(割引率の表示に使う) */
+  regularPrice: number | null
 }
 
 export type ReceiptData = {
@@ -70,6 +73,16 @@ function formatDateTime(iso: string): string {
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+
+// 品目名に添える、セールだったことを示す接尾辞。通常価格が分かって
+// いれば割引率も一緒に表示する(画面表示・Canvas画像化の両方で使う)
+function saleSuffix(item: ReceiptItem): string {
+  if (!item.isOnSale) return ''
+  if (item.regularPrice !== null && calcDiscountPercent(item.regularPrice, item.price) !== null) {
+    return ` ※セール${formatDiscountPercent(item.regularPrice, item.price)}`
+  }
+  return ' ※セール'
 }
 
 function formatElapsedMinutes(startedAt: string | null, completedAt: string): string | null {
@@ -186,7 +199,7 @@ export function ReceiptScreen({ data, onClose }: Props) {
               <div className="flex justify-between">
                 <span className="min-w-0 flex-1 truncate pr-2">
                   {item.name}
-                  {item.isOnSale && ' ※特売'}
+                  {saleSuffix(item)}
                 </span>
                 <span className="shrink-0">¥{(item.price * item.quantity).toLocaleString()}</span>
               </div>
@@ -358,7 +371,7 @@ function drawReceiptToCanvas(
   for (const item of data.items) {
     ctx.fillStyle = INK
     ctx.font = `${11 * SCALE}px 'Courier New', monospace`
-    const fullName = item.isOnSale ? `${item.name} ※特売` : item.name
+    const fullName = `${item.name}${saleSuffix(item)}`
     let name = fullName
     const maxNameWidth = WIDTH - PADDING * 2 - 70 * SCALE
     let wasTruncated = false

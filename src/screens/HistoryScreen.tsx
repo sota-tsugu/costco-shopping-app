@@ -9,6 +9,7 @@ import {
 import { TricolorAccent } from '../components/TricolorAccent'
 import { LineChart, type LineChartPoint } from '../components/LineChart'
 import { ProductHistorySheet } from '../components/ProductHistorySheet'
+import { calcDiscountPercent, formatDiscountPercent } from '../utils/discount'
 
 // 画面C:購入履歴・レポート画面(いつでも振り返れる画面)。
 // 買い物の前後に関わらず、いつでも過去の記録を振り返れる画面として、
@@ -198,7 +199,10 @@ export function HistoryScreen({ onBack }: Props) {
                         {entry.isOnSale && (
                           <span className="flex shrink-0 items-center gap-0.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
                             <Tag className="h-2.5 w-2.5" />
-                            特売
+                            セール
+                            {entry.regularPrice !== null &&
+                              calcDiscountPercent(entry.regularPrice, entry.price) !== null &&
+                              ` ${formatDiscountPercent(entry.regularPrice, entry.price)}`}
                           </span>
                         )}
                       </div>

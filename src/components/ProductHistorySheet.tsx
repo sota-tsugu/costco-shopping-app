@@ -3,6 +3,7 @@ import { X, TrendingUp, TrendingDown, Minus, Pencil, Trash2, Tag } from 'lucide-
 import { useTripStore, fetchPurchaseHistoryByProductName, type ProductPurchaseRecord } from '../store/tripStore'
 import { LineChart, formatYen, type LineChartPoint } from './LineChart'
 import { toDigitsOnly, formatWithCommas } from '../utils/numberInput'
+import { calcDiscountPercent, formatDiscountPercent } from '../utils/discount'
 
 // 商品ごとの詳細シート:単価比較・購入履歴・購入頻度を表示する。
 // (costco_app_concept_v3.mdの「3. 履歴・比較機能」を参照)。
@@ -73,7 +74,7 @@ export function ProductHistorySheet({ productName, onClose }: Props) {
     percent: number
     latestDate: string
     previousDate: string
-    /** どちらかが特売価格だった場合、単純比較が実態とズレる可能性があることを示す */
+    /** どちらかがセール価格だった場合、単純比較が実態とズレる可能性があることを示す */
     involvesSale: boolean
   } | null = null
   if (history && history.length >= 2) {
@@ -174,7 +175,7 @@ export function ProductHistorySheet({ productName, onClose }: Props) {
                     {priceCompare.involvesSale && (
                       <p className="mt-1 flex items-center gap-1 text-xs text-amber-600">
                         <Tag className="h-3 w-3" />
-                        どちらかが特売価格のため、参考程度の比較です
+                        どちらかがセール価格のため、参考程度の比較です
                       </p>
                     )}
                   </>
@@ -210,10 +211,13 @@ export function ProductHistorySheet({ productName, onClose }: Props) {
                     {record.isOnSale && (
                       <span
                         className="flex items-center gap-0.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700"
-                        title="特売価格"
+                        title="セール価格"
                       >
                         <Tag className="h-2.5 w-2.5" />
-                        特売
+                        セール
+                        {record.regularPrice !== null &&
+                          calcDiscountPercent(record.regularPrice, record.price) !== null &&
+                          ` ${formatDiscountPercent(record.regularPrice, record.price)}`}
                       </span>
                     )}
                   </span>
@@ -268,10 +272,15 @@ function EditPurchaseRecordSheet({ record, onClose, onSaved }: EditPurchaseRecor
   const [unit, setUnit] = useState(record.unit ?? '')
   const [quantity, setQuantity] = useState(String(record.quantity))
   const [isOnSale, setIsOnSale] = useState(record.isOnSale)
+  const [regularPrice, setRegularPrice] = useState(record.regularPrice !== null ? String(record.regularPrice) : '')
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
   const canSave = Number(price) > 0 && Number(quantity) > 0
+  const discountPercent =
+    isOnSale && Number(regularPrice) > 0 && Number(price) > 0
+      ? calcDiscountPercent(Number(regularPrice), Number(price))
+      : null
 
   async function handleSave() {
     if (!canSave) return
@@ -283,6 +292,7 @@ function EditPurchaseRecordSheet({ record, onClose, onSaved }: EditPurchaseRecor
         unit: unit.trim() !== '' ? unit.trim() : null,
         quantity: Number(quantity),
         isOnSale,
+        regularPrice: isOnSale && Number(regularPrice) > 0 ? Number(regularPrice) : null,
       })
       await onSaved()
     } finally {
@@ -320,15 +330,34 @@ function EditPurchaseRecordSheet({ record, onClose, onSaved }: EditPurchaseRecor
           onChange={(e) => setPrice(toDigitsOnly(e.target.value))}
           className="mb-2 w-full rounded-lg border border-slate-300 px-3 py-3 text-base focus:border-costco-blue-500 focus:outline-none"
         />
-        <label className="mb-4 flex items-center gap-2 text-sm text-slate-600">
+        <label className="mb-2 flex items-center gap-2 text-sm text-slate-600">
           <input
             type="checkbox"
             checked={isOnSale}
             onChange={(e) => setIsOnSale(e.target.checked)}
             className="h-4 w-4 rounded border-slate-300 text-costco-blue-600 focus:ring-costco-blue-500"
           />
-          特売価格だった
+          セール価格だった
         </label>
+
+        {isOnSale && (
+          <div className="mb-4 rounded-lg bg-amber-50 p-3">
+            <label className="mb-1 block text-xs font-medium text-amber-700">通常価格(任意・割引率の計算に使います)</label>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={formatWithCommas(regularPrice)}
+              onChange={(e) => setRegularPrice(toDigitsOnly(e.target.value))}
+              placeholder="例:1,280"
+              className="w-full rounded-lg border border-amber-200 bg-white px-3 py-2.5 text-base focus:border-amber-400 focus:outline-none"
+            />
+            {discountPercent !== null && (
+              <p className="mt-1.5 text-xs font-medium text-amber-700">
+                通常価格より{discountPercent}%オフです
+              </p>
+            )}
+          </div>
+        )}
 
         <label className="mb-1 block text-xs font-medium text-slate-500">内容量(任意)</label>
         <div className="mb-4 flex gap-2">
