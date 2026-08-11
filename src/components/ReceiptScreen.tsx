@@ -62,6 +62,10 @@ const PAPER_BG = '#fdfcf7'
 const INK = '#2c2c2a'
 const BADGE_BLUE = '#00284C'
 const BADGE_RED = '#E31837'
+// ギザギザ(千切り)の歯の数。JSX(clip-path)とCanvas(画像化)の両方で
+// 必ず同じ値を使うよう、ここに1つだけ定義している。以前は歯の数が
+// 少なく粗い印象だったため、より細かく・リアルな見た目になるよう増やした
+const TORN_EDGE_TEETH = 40
 
 function formatDateTime(iso: string): string {
   const d = new Date(iso)
@@ -173,7 +177,7 @@ export function ReceiptScreen({ data, onClose }: Props) {
   return (
     <div className="fixed inset-0 z-40 flex flex-col items-center justify-center gap-5 overflow-y-auto bg-black/70 px-4 py-8">
       <div
-        style={{ clipPath: tornEdgeClipPath(20), fontFamily: "'Courier New', monospace" }}
+        style={{ clipPath: tornEdgeClipPath(TORN_EDGE_TEETH), fontFamily: "'Courier New', monospace" }}
         className="w-full max-w-[300px] bg-[#fdfcf7] px-5 pb-8 pt-6 text-[#2c2c2a] shadow-xl"
       >
         <div className="mb-2.5 text-center">
@@ -295,9 +299,31 @@ function drawReceiptToCanvas(
   const LINE_H = 15 * SCALE
   const ITEM_BLOCK_H = LINE_H * 2
 
-  const headerH = 92 * SCALE
+  // 【下端が見切れる不具合の修正】以前はheaderH・footerHを固定の概算値
+  // (92px・150px相当)にしていたが、実際の描画量(店舗名の有無・予算差額・
+  // 前回比較の有無で行数が変わる)とズレることがあり、行が多い場合に
+  // バーコードの下部がキャンバスからはみ出て見切れてしまっていた。
+  // ここで実際の描画ロジックと全く同じ計算式を使うことで、見積もりと
+  // 実描画を常に一致させている(下に少し余白も足している)
+  const badgeR = 17 * SCALE
+  let headerH = PADDING
+  headerH += badgeR * 2 + 8 * SCALE // GOバッジ
+  headerH += 15 * SCALE // タイトル
+  if (data.storeName) headerH += 13 * SCALE // 店舗名(あれば)
+  headerH += 14 * SCALE // 日時・所要時間
+  headerH += 14 * SCALE // 区切り線とその後の余白
+
   const itemsH = data.items.length * ITEM_BLOCK_H
-  const footerH = 150 * SCALE
+
+  let footerH = 4 * SCALE + 18 * SCALE // 区切り線前後の余白
+  footerH += 16 * SCALE // 合計
+  if (budgetDiff !== null) footerH += 13 * SCALE
+  if (lastTripDiff !== null) footerH += 13 * SCALE
+  footerH += 8 * SCALE + 20 * SCALE // 区切り線前後の余白
+  footerH += 13 * SCALE + 22 * SCALE // お礼メッセージ2行
+  footerH += 22 * SCALE // 飾りバーコード本体の高さ
+  footerH += 16 * SCALE // バーコードと紙の下端の間の余白
+
   const HEIGHT = headerH + itemsH + footerH
 
   canvas.width = WIDTH
@@ -311,12 +337,11 @@ function drawReceiptToCanvas(
   // あるため、同じ形をパスとして描いてから塗りつぶす。canvasの背景は
   // 元々透明なので、この形の外側は保存画像でも透明になる
   // (画面上は黒背景の上に乗っているため、そこだけ見えていた形)
-  drawTornEdgeBackground(ctx, WIDTH, HEIGHT, 20)
+  drawTornEdgeBackground(ctx, WIDTH, HEIGHT, TORN_EDGE_TEETH)
 
   let y = PADDING
 
-  // GOバッジ
-  const badgeR = 17 * SCALE
+  // GOバッジ(半径はheaderHの計算で使ったbadgeRをそのまま再利用する)
   ctx.beginPath()
   ctx.arc(WIDTH / 2, y + badgeR, badgeR, 0, Math.PI * 2)
   ctx.fillStyle = BADGE_BLUE
