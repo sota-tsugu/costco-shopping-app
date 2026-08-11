@@ -86,6 +86,9 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
   const [lastTripTotal, setLastTripTotal] = useState<number | null>(null)
   const [isPlanRecapOpen, setIsPlanRecapOpen] = useState(false)
   const [isTripPlanOpen, setIsTripPlanOpen] = useState(false)
+  // 「買い物を始める」が行く予定日・店舗の未入力で止められた時にtrueにする。
+  // TripPlanSheetを開いた時、未入力の項目を赤く強調表示するために使う
+  const [tripPlanValidationFailed, setTripPlanValidationFailed] = useState(false)
   const [historyProductName, setHistoryProductName] = useState<string | null>(null)
 
   // トリップが無ければ、初期予算3万円でplanningトリップを自動的に作る
@@ -225,8 +228,17 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
   // 誤って新しいボタンへ伝わってしまう現象)などで意図せず押されて
   // しまうと、気づかないまま買い物中の状態になってしまう問題があった。
   // 会計・計画中へ戻るなど他の重要な操作と同様に、確認ダイアログを
-  // 挟むことで誤操作の影響を防ぐ
+  // 挟むことで誤操作の影響を防ぐ。
+  //
+  // 【行く予定日・店舗の入力必須化】どちらか未入力のまま買い物を
+  // 始めようとした場合は、開始せずにTripPlanSheetを開き、未入力の
+  // 項目を赤く強調表示する(tripPlanValidationFailed)
   async function handleStartShopping() {
+    if (!currentTrip?.plannedDate || !currentTrip?.storeName) {
+      setTripPlanValidationFailed(true)
+      setIsTripPlanOpen(true)
+      return
+    }
     const confirmed = window.confirm('買い物を始めますか?')
     if (!confirmed) return
     await startShopping()
@@ -357,25 +369,39 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
                 前回の購入額 ¥{lastTripTotal.toLocaleString()}
               </p>
             )}
-            {currentTrip && (
-              <button
-                onClick={() => setIsTripPlanOpen(true)}
-                className="mt-2 flex w-full items-center justify-between rounded-lg bg-white/10 px-2.5 py-1.5 text-xs text-costco-blue-100 active:bg-white/20"
-              >
-                <span className="flex min-w-0 items-center gap-1.5 truncate">
-                  <Calendar className="h-3.5 w-3.5 shrink-0" />
-                  {currentTrip.plannedDate || currentTrip.storeName ? (
-                    <span className="truncate">
-                      {currentTrip.plannedDate ? formatPlannedDate(currentTrip.plannedDate) : '日程未定'}
-                      {currentTrip.storeName ? ` ・ ${currentTrip.storeName}` : ''}
+            {currentTrip &&
+              (() => {
+                const isTripPlanIncomplete = !currentTrip.plannedDate || !currentTrip.storeName
+                return (
+                  <button
+                    onClick={() => setIsTripPlanOpen(true)}
+                    className={`mt-2 flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-xs ${
+                      isTripPlanIncomplete
+                        ? 'bg-costco-red-700 text-white active:bg-costco-red-800'
+                        : 'bg-white/10 text-costco-blue-100 active:bg-white/20'
+                    }`}
+                  >
+                    <span className="flex min-w-0 items-center gap-1.5 truncate">
+                      {isTripPlanIncomplete ? (
+                        <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                      ) : (
+                        <Calendar className="h-3.5 w-3.5 shrink-0" />
+                      )}
+                      {currentTrip.plannedDate || currentTrip.storeName ? (
+                        <span className="truncate">
+                          {currentTrip.plannedDate ? formatPlannedDate(currentTrip.plannedDate) : '日程未定'}
+                          {currentTrip.storeName ? ` ・ ${currentTrip.storeName}` : '(店舗未入力)'}
+                        </span>
+                      ) : (
+                        '行く予定日・店舗を入力してください'
+                      )}
                     </span>
-                  ) : (
-                    '行く予定日・店舗を設定'
-                  )}
-                </span>
-                <Pencil className="h-3 w-3 shrink-0 text-costco-blue-200" />
-              </button>
-            )}
+                    <Pencil
+                      className={`h-3 w-3 shrink-0 ${isTripPlanIncomplete ? 'text-white/80' : 'text-costco-blue-200'}`}
+                    />
+                  </button>
+                )
+              })()}
           </div>
         )}
 
@@ -725,7 +751,11 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
         <TripPlanSheet
           plannedDate={currentTrip.plannedDate}
           storeName={currentTrip.storeName}
-          onClose={() => setIsTripPlanOpen(false)}
+          showMissingWarning={tripPlanValidationFailed}
+          onClose={() => {
+            setIsTripPlanOpen(false)
+            setTripPlanValidationFailed(false)
+          }}
           onSave={(plannedDate, storeName) => {
             void updateTripPlan(plannedDate, storeName)
           }}
@@ -1187,24 +1217,36 @@ function PlanRecapSheet({ budget, items, onClose }: PlanRecapSheetProps) {
 type TripPlanSheetProps = {
   plannedDate: string | null
   storeName: string | null
+  /** 「買い物を始める」が未入力で止められて開かれた場合にtrue。
+   * 未入力の項目を赤く強調表示し、上部に案内を出す */
+  showMissingWarning?: boolean
   onClose: () => void
   onSave: (plannedDate: string | null, storeName: string | null) => void
 }
 
 /**
  * 計画中の画面から開く、行く予定日・店舗を設定するシート。
- * どちらも任意項目(未設定のままでも買い物を始められる)。
- * 店舗は一覧から選ぶ形式だが、リストに無い店舗にも対応できるよう
- * 「その他(自由入力)」を用意している(costcoStores.tsを参照。
- * Web検索で確認できた店舗のみのリストのため、全店舗を網羅していない)
+ * 通常時はどちらも任意項目として保存できる(自分のペースで先に
+ * 片方だけ決めておく、といった使い方ができるように)。ただし
+ * 「買い物を始める」時点ではどちらも入力必須にしており、未入力の
+ * まま始めようとするとこのシートが開き、足りない項目を強調表示する
+ * (showMissingWarning)。店舗は一覧から選ぶ形式だが、リストに無い
+ * 店舗にも対応できるよう「その他(自由入力)」を用意している
+ * (costcoStores.tsを参照。Web検索で確認できた店舗のみのリストのため、
+ * 全店舗を網羅していない)
  */
-function TripPlanSheet({ plannedDate, storeName, onClose, onSave }: TripPlanSheetProps) {
+function TripPlanSheet({ plannedDate, storeName, showMissingWarning, onClose, onSave }: TripPlanSheetProps) {
   const isKnownStore = storeName !== null && COSTCO_STORES.includes(storeName)
   const [date, setDate] = useState(plannedDate ?? '')
   const [selectedStore, setSelectedStore] = useState(
     storeName === null ? '' : isKnownStore ? storeName : OTHER_STORE_VALUE,
   )
   const [customStore, setCustomStore] = useState(isKnownStore || storeName === null ? '' : storeName)
+
+  // 保存されている値ではなく、今まさに入力中の内容を見て「今も未入力か」
+  // を判定する。入力し始めればその場で赤い強調が消えるようにするため
+  const isDateMissing = showMissingWarning && date === ''
+  const isStoreMissing = showMissingWarning && selectedStore === ''
 
   function handleSave() {
     const finalStore = selectedStore === OTHER_STORE_VALUE ? customStore.trim() || null : selectedStore || null
@@ -1222,22 +1264,41 @@ function TripPlanSheet({ plannedDate, storeName, onClose, onSave }: TripPlanShee
           </button>
         </div>
 
+        {showMissingWarning && (
+          <div className="mb-4 flex items-start gap-2 rounded-lg bg-costco-red-50 p-3 text-xs text-costco-red-700">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>行く予定日・店舗の両方を入力すると、買い物を始められます。</span>
+          </div>
+        )}
+
         <label className="mb-3 block">
-          <span className="mb-1 block text-xs font-medium text-slate-500">予定日</span>
+          <span className={`mb-1 block text-xs font-medium ${isDateMissing ? 'text-costco-red-600' : 'text-slate-500'}`}>
+            予定日{isDateMissing && '(未入力)'}
+          </span>
           <input
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-costco-blue-500 focus:outline-none"
+            className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none ${
+              isDateMissing
+                ? 'border-costco-red-400 focus:border-costco-red-500'
+                : 'border-slate-200 focus:border-costco-blue-500'
+            }`}
           />
         </label>
 
         <label className="block">
-          <span className="mb-1 block text-xs font-medium text-slate-500">店舗</span>
+          <span className={`mb-1 block text-xs font-medium ${isStoreMissing ? 'text-costco-red-600' : 'text-slate-500'}`}>
+            店舗{isStoreMissing && '(未入力)'}
+          </span>
           <select
             value={selectedStore}
             onChange={(e) => setSelectedStore(e.target.value)}
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-costco-blue-500 focus:outline-none"
+            className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none ${
+              isStoreMissing
+                ? 'border-costco-red-400 focus:border-costco-red-500'
+                : 'border-slate-200 focus:border-costco-blue-500'
+            }`}
           >
             <option value="">選択しない</option>
             {COSTCO_STORES.map((store) => (
