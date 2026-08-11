@@ -75,6 +75,15 @@ export function CartScreen({ onBack }: Props) {
     setIsCheckingOut(true)
     try {
       await completeCheckout()
+    } catch (error) {
+      // 会計の完了に失敗した場合、これまでは何も表示されず「買い物中」の
+      // 表示が残り続けたまま気づけなかったため、エラーを明示的に伝える
+      // ようにした(電波が悪い場所で通信が失敗した場合など)
+      window.alert(
+        `買い物の終了に失敗しました。電波の良い場所で、もう一度「購入する」をお試しください。\n(${
+          error instanceof Error ? error.message : String(error)
+        })`,
+      )
     } finally {
       setIsCheckingOut(false)
     }

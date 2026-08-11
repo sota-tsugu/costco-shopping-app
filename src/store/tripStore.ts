@@ -203,10 +203,24 @@ export const useTripStore = create<TripStoreState>((set, get) => ({
         (error) => set({ errorMessage: error.message }),
       )
 
-      // 「planning」または「active」の、進行中のトリップをリアルタイム購読する
+      // 「planning」または「active」の、進行中のトリップをリアルタイム購読する。
+      // トリップが切り替わる(会計完了→新しい計画中トリップの作成、など)
+      // たびに、下のtripItems購読(unsubscribeTripItems)を必ず一度解除して
+      // から新しく購読し直す。解除せずに購読を重ねてしまうと、古い
+      // トリップ側の変更(購入済みへの更新など)が後から届いた時に、
+      // 今表示すべき新しいトリップのtripItemsを上書きしてしまうバグに
+      // なる(会計完了後も買い物中の表示が残ってしまう不具合の原因の1つ
+      // だったため修正した)
+      let unsubscribeTripItems: (() => void) | null = null
+
       onSnapshot(
         query(householdCollection(householdId, 'shoppingTrips'), where('status', 'in', ['planning', 'active'])),
         (snapshot) => {
+          if (unsubscribeTripItems) {
+            unsubscribeTripItems()
+            unsubscribeTripItems = null
+          }
+
           if (snapshot.empty) {
             set({ currentTrip: null, tripItems: [] })
             return
@@ -231,7 +245,7 @@ export const useTripStore = create<TripStoreState>((set, get) => ({
           set({ currentTrip: trip })
 
           // このトリップに属する商品(tripItems)もリアルタイム購読する
-          onSnapshot(
+          unsubscribeTripItems = onSnapshot(
             query(householdCollection(householdId, 'tripItems'), where('tripId', '==', trip.id)),
             (itemsSnapshot) => {
               const tripItems: TripItem[] = itemsSnapshot.docs
