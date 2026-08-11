@@ -111,11 +111,10 @@ export function CartScreen({ onBack, onCheckoutComplete }: Props) {
         lastTripTotal,
       }
       await completeCheckout()
-      // 会計完了の直後、カートが空になった画面(¥0・0点)を一瞬でも
-      // 目にしてから、レシートをポップさせる。間を置かず即座に
-      // レシートを出すと、空になったカートを見る間もなくレシートで
-      // 覆われてしまい、「会計が終わった」という実感が薄くなるため
-      await new Promise((resolve) => setTimeout(resolve, 500))
+      // 会計完了の直後、カートが空になった画面(¥0・0点)をはっきり
+      // 目にしてから、レシートをポップさせる。以前は0.5秒にしていたが
+      // 「一瞬すぎて確認できない」とのことだったため、1.5秒に伸ばした
+      await new Promise((resolve) => setTimeout(resolve, 1500))
       onCheckoutComplete(receiptData)
     } catch (error) {
       // 会計の完了に失敗した場合、これまでは何も表示されず「買い物中」の
