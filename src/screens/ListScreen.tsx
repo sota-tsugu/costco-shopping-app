@@ -181,6 +181,16 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
     return catalogTotal + scannedTotal
   }, [products, consideringItemByProductId, scannedItems])
 
+  // 計画中に選んでいる商品の合計点数(検討中・会計待ちの両方、数量の
+  // 合計)。買い物中のカート点数表示と同じ考え方で、行数ではなく数量を数える
+  const plannedCount = useMemo(
+    () =>
+      tripItems
+        .filter((item) => item.status === 'considering' || item.status === 'inCart')
+        .reduce((sum, item) => sum + item.quantity, 0),
+    [tripItems],
+  )
+
   const cartTotal = useMemo(() => {
     return tripItems
       .filter((item) => item.status === 'inCart')
@@ -348,7 +358,7 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
           <div className="mt-3">
             <div className="flex items-end justify-between">
               <div>
-                <span className="text-xs text-costco-blue-100">見込み合計</span>
+                <span className="text-xs text-costco-blue-100">見込み合計・{plannedCount}点</span>
                 <div
                   className={`text-2xl font-semibold tracking-tight ${isOverBudgetPlanning ? 'text-costco-red-200' : ''}`}
                 >
@@ -865,6 +875,94 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
   )
 }
 
+// カテゴリ欄で「新しいカテゴリを追加」を選んだ時に使う特別な値。
+// TripPlanSheetの店舗選択(その他=自由入力)と同じ考え方
+const NEW_CATEGORY_VALUE = '__new_category__'
+
+type CategorySelectFieldProps = {
+  /** 現在のカテゴリ(空文字=未選択)。呼び出し側のフォームの状態をそのまま渡す */
+  value: string
+  /** 選択肢として出す既存カテゴリの一覧 */
+  options: string[]
+  onChange: (category: string) => void
+}
+
+/**
+ * カテゴリの入力欄。以前はテキスト入力+datalist(ブラウザ標準の入力候補)
+ * だったが、スマホでは候補一覧がうまく表示されず「選択肢から選べている」
+ * 実感が薄かった。TripPlanSheetの店舗選択(一覧から選ぶ/その他で自由入力)
+ * と同じ、select+切り替え式の自由入力欄という組み合わせに変更している。
+ *
+ * 【選択モードへの復帰について】商品名の候補を選ぶとカテゴリも一緒に
+ * 自動で入る(handlePickSuggestion)。その際に選択モードへ戻すため、
+ * 呼び出し側でこのコンポーネントのkeyを変更して再マウントさせている
+ * (内部のmodeは初回マウント時のvalueだけを見て決めるシンプルな作りに
+ * しているため)
+ */
+function CategorySelectField({ value, options, onChange }: CategorySelectFieldProps) {
+  const isKnownValue = value === '' || options.includes(value)
+  const [mode, setMode] = useState<'select' | 'new'>(isKnownValue ? 'select' : 'new')
+  const [newInput, setNewInput] = useState(isKnownValue ? '' : value)
+
+  function handleSelectChange(v: string) {
+    if (v === NEW_CATEGORY_VALUE) {
+      setMode('new')
+      setNewInput('')
+      onChange('')
+    } else {
+      setMode('select')
+      onChange(v)
+    }
+  }
+
+  function handleNewInputChange(v: string) {
+    setNewInput(v)
+    onChange(v)
+  }
+
+  if (mode === 'new') {
+    return (
+      <div className="flex gap-2">
+        <input
+          type="text"
+          autoFocus
+          value={newInput}
+          onChange={(e) => handleNewInputChange(e.target.value)}
+          placeholder="新しいカテゴリ名(例:日用品)"
+          className="w-full flex-1 rounded-lg border border-slate-300 px-3 py-3 text-base focus:border-costco-blue-500 focus:outline-none"
+        />
+        <button
+          type="button"
+          onClick={() => {
+            setMode('select')
+            setNewInput('')
+            onChange('')
+          }}
+          className="shrink-0 rounded-lg border border-slate-300 px-3 text-xs text-slate-500"
+        >
+          一覧から選ぶ
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <select
+      value={value}
+      onChange={(e) => handleSelectChange(e.target.value)}
+      className="w-full rounded-lg border border-slate-300 px-3 py-3 text-base focus:border-costco-blue-500 focus:outline-none"
+    >
+      <option value="">カテゴリなし</option>
+      {options.map((c) => (
+        <option key={c} value={c}>
+          {c}
+        </option>
+      ))}
+      <option value={NEW_CATEGORY_VALUE}>＋ 新しいカテゴリを追加</option>
+    </select>
+  )
+}
+
 type AddProductSheetProps = {
   existingProducts: Product[]
   onClose: () => void
@@ -885,6 +983,9 @@ function AddProductSheet({ existingProducts, onClose, onSubmit }: AddProductShee
   const [unit, setUnit] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [isSuggestionsOpen, setIsSuggestionsOpen] = useState(false)
+  // 商品名の候補を選ぶとカテゴリ欄も自動で選択モードに戻したいため、
+  // このkeyを変えてCategorySelectFieldを再マウントさせる
+  const [categoryFieldResetKey, setCategoryFieldResetKey] = useState(0)
 
   // 商品名候補データベース(costcotuu.com由来・約3200件)から、商品名の
   // 入力補助を行う。名前を選ぶとカテゴリも一緒に入る。
@@ -912,6 +1013,7 @@ function AddProductSheet({ existingProducts, onClose, onSubmit }: AddProductShee
   function handlePickSuggestion(entry: { name: string; category: string }) {
     setName(entry.name)
     setCategory(entry.category)
+    setCategoryFieldResetKey((k) => k + 1)
     setIsSuggestionsOpen(false)
   }
 
@@ -944,7 +1046,7 @@ function AddProductSheet({ existingProducts, onClose, onSubmit }: AddProductShee
         </div>
 
         <label className="mb-1 block text-xs font-medium text-slate-500">商品名</label>
-        <div className="relative mb-4">
+        <div className="relative mb-1">
           <input
             type="text"
             value={name}
@@ -953,9 +1055,24 @@ function AddProductSheet({ existingProducts, onClose, onSubmit }: AddProductShee
               setIsSuggestionsOpen(true)
             }}
             onFocus={() => setIsSuggestionsOpen(true)}
+            onBlur={() => {
+              // 候補をタップした瞬間のonClickより先に閉じてしまわないよう、
+              // 少し遅らせてから閉じる(タッチ操作向けの定番の対処)
+              window.setTimeout(() => setIsSuggestionsOpen(false), 150)
+            }}
             placeholder="例:トイレットペーパー"
-            className="w-full rounded-lg border border-slate-300 px-3 py-3 text-base focus:border-costco-blue-500 focus:outline-none"
+            className="w-full rounded-lg border border-slate-300 px-3 py-3 pr-9 text-base focus:border-costco-blue-500 focus:outline-none"
           />
+          {name !== '' && (
+            <button
+              type="button"
+              onClick={() => setName('')}
+              aria-label="商品名を消去する"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-slate-300 hover:bg-slate-100 hover:text-slate-500"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
           {isSuggestionsOpen && nameSuggestions.length > 0 && (
             <ul className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
               {nameSuggestions.map((entry, index) => (
@@ -974,21 +1091,18 @@ function AddProductSheet({ existingProducts, onClose, onSubmit }: AddProductShee
             </ul>
           )}
         </div>
+        {/* 候補に無い商品でも困らないよう、自由入力ができることを明示している */}
+        <p className="mb-4 text-xs text-slate-400">候補になければ、そのまま自由に入力・修正できます。</p>
 
         <label className="mb-1 block text-xs font-medium text-slate-500">カテゴリ(任意)</label>
-        <input
-          type="text"
-          list="category-options"
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          placeholder="例:日用品"
-          className="mb-4 w-full rounded-lg border border-slate-300 px-3 py-3 text-base focus:border-costco-blue-500 focus:outline-none"
-        />
-        <datalist id="category-options">
-          {categoryOptions.map((c) => (
-            <option key={c} value={c} />
-          ))}
-        </datalist>
+        <div className="mb-4">
+          <CategorySelectField
+            key={categoryFieldResetKey}
+            value={category}
+            options={categoryOptions}
+            onChange={setCategory}
+          />
+        </div>
 
         <label className="mb-1 block text-xs font-medium text-slate-500">価格(円・任意)</label>
         <input
@@ -1114,19 +1228,9 @@ function EditProductSheet({ product, existingProducts, onClose, onSubmit, onDele
         />
 
         <label className="mb-1 block text-xs font-medium text-slate-500">カテゴリ(任意)</label>
-        <input
-          type="text"
-          list="edit-category-options"
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          placeholder="例:日用品"
-          className="mb-4 w-full rounded-lg border border-slate-300 px-3 py-3 text-base focus:border-costco-blue-500 focus:outline-none"
-        />
-        <datalist id="edit-category-options">
-          {categoryOptions.map((c) => (
-            <option key={c} value={c} />
-          ))}
-        </datalist>
+        <div className="mb-4">
+          <CategorySelectField value={category} options={categoryOptions} onChange={setCategory} />
+        </div>
 
         <label className="mb-1 block text-xs font-medium text-slate-500">価格(円・任意)</label>
         <input
