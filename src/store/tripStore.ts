@@ -184,6 +184,12 @@ type TripStoreState = {
   ) => Promise<void>
   /** 購入済みの記録(1件)を削除する。削除後、トリップの実際の合計金額も再計算する */
   removePurchaseRecord: (tripId: string, tripItemId: string) => Promise<void>
+  /**
+   * 過去の購入履歴(完了済みのトリップ・購入済みのtripItems)をすべて
+   * 削除する(元に戻せない)。テスト運用中に入力していた数値・商品名を
+   * リセットして、正式運用を始める際に使う想定
+   */
+  clearPurchaseHistory: () => Promise<void>
 }
 
 function householdCollection(householdId: string, name: string): CollectionReference {
@@ -628,6 +634,26 @@ export const useTripStore = create<TripStoreState>((set, get) => ({
     const householdId = requireHouseholdId()
     await deleteDoc(doc(householdCollection(householdId, 'tripItems'), tripItemId))
     await recalculateTripActualTotal(householdId, tripId)
+  },
+
+  async clearPurchaseHistory() {
+    const householdId = requireHouseholdId()
+    const [tripsSnapshot, itemsSnapshot] = await Promise.all([
+      getDocs(query(householdCollection(householdId, 'shoppingTrips'), where('status', '==', 'completed'))),
+      getDocs(query(householdCollection(householdId, 'tripItems'), where('status', '==', 'purchased'))),
+    ])
+    const refsToDelete = [...tripsSnapshot.docs, ...itemsSnapshot.docs].map((d) => d.ref)
+    // Firestoreの1回のバッチは最大500件の操作までのため、余裕を持って
+    // 450件ずつに分割してコミットする(テスト運用の範囲では通常1回で
+    // 収まる想定だが、念のための対応)
+    const CHUNK_SIZE = 450
+    for (let i = 0; i < refsToDelete.length; i += CHUNK_SIZE) {
+      const batch = writeBatch(db)
+      for (const ref of refsToDelete.slice(i, i + CHUNK_SIZE)) {
+        batch.delete(ref)
+      }
+      await batch.commit()
+    }
   },
 }))
 

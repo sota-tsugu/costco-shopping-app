@@ -22,10 +22,13 @@ export function SettingsModal({ onClose }: Props) {
   const [isUpdating, setIsUpdating] = useState(false)
   const [isCopied, setIsCopied] = useState(false)
   const [isClearingProducts, setIsClearingProducts] = useState(false)
+  const [isClearingAllTestData, setIsClearingAllTestData] = useState(false)
   const [isHelpOpen, setIsHelpOpen] = useState(false)
   const householdId = getSavedHouseholdId()
   const products = useTripStore((state) => state.products)
   const clearAllProducts = useTripStore((state) => state.clearAllProducts)
+  const resetTripPlan = useTripStore((state) => state.resetTripPlan)
+  const clearPurchaseHistory = useTripStore((state) => state.clearPurchaseHistory)
 
   async function handleUpdate() {
     setIsUpdating(true)
@@ -60,6 +63,27 @@ export function SettingsModal({ onClose }: Props) {
       await clearAllProducts()
     } finally {
       setIsClearingProducts(false)
+    }
+  }
+
+  // 「テストデータをすべて消去して正式運用を始める」:テスト運用中に
+  // 入力していた購入履歴・計画中の内容・定番商品リストを、まとめて
+  // 未設定の状態に戻す(元に戻せない)。正式運用を始める際の一回限りの
+  // 操作を想定しており、通常運用では基本的に使わない
+  async function handleClearAllTestData() {
+    const confirmed = window.confirm(
+      '過去の購入履歴・今計画中の内容(選んでいる商品・予算・行く予定日/店舗)・定番商品リストを、すべて削除します。\n\n' +
+        'テスト運用中に入力していた内容をリセットして、正式運用を始めるための操作です。元に戻せません。よろしいですか?',
+    )
+    if (!confirmed) return
+    setIsClearingAllTestData(true)
+    try {
+      await clearPurchaseHistory()
+      await resetTripPlan()
+      await clearAllProducts()
+      window.alert('テストデータをすべて削除しました。ここから正式運用を始められます。')
+    } finally {
+      setIsClearingAllTestData(false)
     }
   }
 
@@ -156,6 +180,21 @@ export function SettingsModal({ onClose }: Props) {
           >
             <Trash2 className="h-4 w-4" />
             {isClearingProducts ? '削除しています…' : '定番商品リストを空にする'}
+          </button>
+        </div>
+
+        <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-4">
+          <p className="mb-2 text-sm font-semibold text-red-700">テストデータをすべて消去して正式運用を始める</p>
+          <p className="mb-3 text-xs text-slate-500">
+            これまでテストとして入力していた購入履歴・今計画中の内容(選んでいる商品・予算・行く予定日/店舗)・定番商品リストを、まとめて削除します。正式運用を始める前の、一回限りの操作を想定しています。
+          </p>
+          <button
+            onClick={handleClearAllTestData}
+            disabled={isClearingAllTestData}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-white shadow disabled:opacity-50"
+          >
+            <Trash2 className="h-4 w-4" />
+            {isClearingAllTestData ? '削除しています…' : 'テストデータをすべて削除する'}
           </button>
         </div>
       </div>

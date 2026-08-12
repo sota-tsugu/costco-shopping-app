@@ -65,7 +65,7 @@ const BADGE_RED = '#E31837'
 // ギザギザ(千切り)の歯の数。JSX(clip-path)とCanvas(画像化)の両方で
 // 必ず同じ値を使うよう、ここに1つだけ定義している。以前は歯の数が
 // 少なく粗い印象だったため、より細かく・リアルな見た目になるよう増やした
-const TORN_EDGE_TEETH = 40
+const TORN_EDGE_TEETH = 30
 
 function formatDateTime(iso: string): string {
   const d = new Date(iso)
