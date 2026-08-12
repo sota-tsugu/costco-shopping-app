@@ -41,6 +41,33 @@ function formatPlannedDate(dateStr: string): string {
   return d.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', weekday: 'short' })
 }
 
+type PriceTagProps = {
+  /** 単価。未登録(null)または0円の場合は「価格未設定」の警告表示にする */
+  unitPrice: number | null
+  /** 単価にかける数量・倍率(すでに合計した金額を渡したい場合は1を渡す) */
+  multiplier: number
+}
+
+/**
+ * リスト上の価格表示。計画中・買い物中どちらのリストでも、価格が
+ * 未登録(null)または0円のまま登録されていると、見返した時に
+ * 「本当に0円なのか、単に入力し忘れているだけなのか」が分かりにくい。
+ * そこで¥0のまま普通に表示するのではなく、目立つ警告バッジに切り替えて
+ * 一目で気づけるようにしている(定番商品リストの価格・買い物中の
+ * カート内商品の価格、両方で共通して使う)
+ */
+function PriceTag({ unitPrice, multiplier }: PriceTagProps) {
+  if (unitPrice === null || unitPrice === 0) {
+    return (
+      <span className="flex shrink-0 items-center gap-0.5 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+        <AlertTriangle className="h-3 w-3" />
+        価格未設定
+      </span>
+    )
+  }
+  return <span className="shrink-0 text-xs text-slate-400">¥{(unitPrice * multiplier).toLocaleString()}</span>
+}
+
 // 画面A:今回買うものリスト画面。
 // 買い物前の計画(定番商品リストから選ぶ・予算設定)から、店内での進行管理
 // (検討中→会計待ち→購入済の状態表示)まで、一貫して担う中心画面。
@@ -608,9 +635,7 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
                           </button>
                         </div>
                       )}
-                      <span className="shrink-0 text-xs text-slate-400">
-                        ¥{((product.defaultPrice ?? 0) * (checked ? quantity : 1)).toLocaleString()}
-                      </span>
+                      <PriceTag unitPrice={product.defaultPrice} multiplier={checked ? quantity : 1} />
                     </li>
                   )
                 })}
@@ -642,9 +667,7 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
                       <Plus className="h-3.5 w-3.5 text-slate-700" />
                     </button>
                   </div>
-                  <span className="shrink-0 text-xs text-slate-400">
-                    ¥{((item.price ?? 0) * item.quantity).toLocaleString()}
-                  </span>
+                  <PriceTag unitPrice={item.price} multiplier={item.quantity} />
                   <button
                     onClick={() => removeTripItem(item.id)}
                     className="shrink-0 p-1 text-slate-300 active:text-red-500"
@@ -732,9 +755,7 @@ export function ListScreen({ onOpenCart, onOpenHistory }: Props) {
                             <Plus className="h-3.5 w-3.5 text-slate-700" />
                           </button>
                         </div>
-                        <span className="shrink-0 text-xs text-slate-400">
-                          ¥{((item.price ?? 0) * item.quantity).toLocaleString()}
-                        </span>
+                        <PriceTag unitPrice={item.price} multiplier={item.quantity} />
                         {/* 計画時の基準価格と、実際に店頭で見た価格が違うことが
                             あるため、カートに入っている商品はここで価格・内容量・
                             単位・セールかどうかを修正できるようにしている */}
